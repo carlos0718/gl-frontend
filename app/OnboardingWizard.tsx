@@ -1,4 +1,4 @@
-import {Colors} from '@/interfaces/constants/Colors';
+import {Colors} from '@/constants/Colors';
 import {Ionicons} from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useState} from 'react';

@@ -1,5 +1,6 @@
-import {Colors} from '@/interfaces/constants/Colors';
-import {CreateGroupRequest, Group, GroupService} from '@/services/groupService';
+import {Colors} from '@/constants/Colors';
+import {ICreateGroupRequest, IGroup} from '@/interfaces/group';
+import {GroupService} from '@/services/groupService';
 import {Ionicons} from '@expo/vector-icons';
 import React, {useEffect, useState} from 'react';
 import {
@@ -19,7 +20,7 @@ import {
 interface CreateGroupModalProps {
 	visible: boolean;
 	onClose: () => void;
-	onGroupCreated: (group: Group) => void;
+	onGroupCreated: (group: IGroup) => void;
 	userLocation: {
 		latitude: number;
 		longitude: number;
@@ -78,7 +79,7 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 
 		setIsLoading(true);
 		try {
-			const groupData: CreateGroupRequest = {
+			const groupData: ICreateGroupRequest = {
 				name: groupName.trim(),
 				description: description.trim(),
 				address: userLocation!.address,

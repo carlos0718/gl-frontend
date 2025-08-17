@@ -1,4 +1,4 @@
-import {Colors} from '@/interfaces/constants/Colors';
+import {Colors} from '@/constants/Colors';
 import {Ionicons} from '@expo/vector-icons';
 import {Tabs} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
