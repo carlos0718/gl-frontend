@@ -1,5 +1,5 @@
 // Adaptada de la interfaz del backend
-export interface User {
+export interface IUser {
 	id: string;
 	name: string;
 	lastName: string;
@@ -10,7 +10,7 @@ export interface User {
 }
 
 // Interfaz para la respuesta de la API de login
-export interface AuthResponse {
+export interface IAuthResponse {
 	token: string;
-	user: User;
+	user: IUser;
 }

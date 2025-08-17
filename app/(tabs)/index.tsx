@@ -1,6 +1,6 @@
 import CreateGroupModal from '@/components/CreateGroupModal';
 import EmptyGroupsState from '@/components/EmptyGroupsState';
-import {Colors} from '@/interfaces/constants/Colors';
+import {Colors} from '@/constants/Colors';
 import {Group, GroupService} from '@/services/groupService';
 import {Ionicons} from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';

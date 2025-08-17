@@ -1,41 +1,10 @@
+import {ICreateGroupRequest, IGroup, INearbyGroupsRequest} from '@/interfaces/group';
+
 import apiService from './apiService';
-
-export interface Group {
-	id: string;
-	name: string;
-	description: string;
-	address: string;
-	latitude: number;
-	longitude: number;
-	distance?: number;
-	members: number;
-	maxMembers: number;
-	category: string;
-	createdBy: string;
-	createdAt: string;
-	isActive: boolean;
-}
-
-export interface CreateGroupRequest {
-	name: string;
-	description: string;
-	address: string;
-	latitude: number;
-	longitude: number;
-	maxMembers: number;
-	category: string;
-}
-
-export interface NearbyGroupsRequest {
-	latitude: number;
-	longitude: number;
-	radius: number;
-	category?: string;
-}
 
 export class GroupService {
 	// Obtener grupos cercanos
-	static async getNearbyGroups(params: NearbyGroupsRequest): Promise<Group[]> {
+	static async getNearbyGroups(params: INearbyGroupsRequest): Promise<IGroup[]> {
 		try {
 			const queryParams = new URLSearchParams({
 				lat: params.latitude.toString(),
@@ -44,7 +13,7 @@ export class GroupService {
 				...(params.category && {category: params.category})
 			});
 
-			return await apiService<Group[]>(`groups/nearby?${queryParams}`, {
+			return await apiService<IGroup[]>(`groups/nearby?${queryParams}`, {
 				method: 'GET',
 				needsAuth: true
 			});
@@ -55,9 +24,9 @@ export class GroupService {
 	}
 
 	// Crear un nuevo grupo
-	static async createGroup(groupData: CreateGroupRequest): Promise<Group> {
+	static async createGroup(groupData: ICreateGroupRequest): Promise<IGroup> {
 		try {
-			return await apiService<Group>('groups', {
+			return await apiService<IGroup>('groups', {
 				method: 'POST',
 				body: groupData,
 				needsAuth: true
@@ -82,9 +51,9 @@ export class GroupService {
 	}
 
 	// Obtener detalles de un grupo
-	static async getGroupDetails(groupId: string): Promise<Group> {
+	static async getGroupDetails(groupId: string): Promise<IGroup> {
 		try {
-			return await apiService<Group>(`groups/${groupId}`, {
+			return await apiService<IGroup>(`groups/${groupId}`, {
 				method: 'GET',
 				needsAuth: true
 			});
