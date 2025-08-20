@@ -1,6 +1,7 @@
+import {API_CONFIG} from '@/config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = API_CONFIG.API_URL;
 
 type RequestOptions = {
 	method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -21,9 +22,10 @@ async function apiService<T>(endpoint: string, options: RequestOptions = {}): Pr
 		const token = await AsyncStorage.getItem('authToken');
 		if (token) {
 			headers['Authorization'] = `Bearer ${token}`;
+			console.log('🔐 Token de autenticación encontrado y agregado');
 		} else {
-			// Podrías redirigir al login o manejar el caso donde el token no existe
-			console.warn('Petición necesita autenticación pero no se encontró el token.');
+			console.error('❌ Petición necesita autenticación pero no se encontró el token.');
+			throw new Error('401 - Token de autenticación no encontrado. Por favor inicia sesión nuevamente.');
 		}
 	}
 
@@ -34,11 +36,32 @@ async function apiService<T>(endpoint: string, options: RequestOptions = {}): Pr
 	};
 
 	try {
-		const response = await fetch(`${API_URL}/${endpoint}`, config);
+		const fullUrl = `${API_URL}/${endpoint}`;
+		console.log('🌐 API Request:', fullUrl);
+		console.log('📡 Request config:', {method, headers, body});
+
+		const response = await fetch(fullUrl, config);
 
 		if (!response.ok) {
 			const errorData = await response.json().catch(() => ({message: 'Error desconocido en la API'}));
-			throw new Error(errorData.message || `Error en la petición: ${response.status}`);
+
+			// Manejo específico de errores de autenticación
+			if (response.status === 401) {
+				console.error('🔐 Error de autenticación:', errorData);
+				throw new Error('401 - Sesión expirada o token inválido. Por favor inicia sesión nuevamente.');
+			} else if (response.status === 403) {
+				console.error('🚫 Error de autorización:', errorData);
+				throw new Error('403 - No tienes permisos para realizar esta acción.');
+			} else if (response.status === 404) {
+				console.error('🔍 Recurso no encontrado:', errorData);
+				throw new Error('404 - El recurso solicitado no fue encontrado.');
+			} else if (response.status >= 500) {
+				console.error('💥 Error del servidor:', errorData);
+				throw new Error('500 - Error interno del servidor. Intenta más tarde.');
+			} else {
+				console.error('❌ Error en la petición:', errorData);
+				throw new Error(errorData.message || `Error en la petición: ${response.status}`);
+			}
 		}
 
 		// Si la respuesta no tiene cuerpo (ej. en un DELETE o un 204 No Content),

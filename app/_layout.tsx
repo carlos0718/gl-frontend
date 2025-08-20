@@ -30,15 +30,28 @@ export default function RootLayout() {
 				AsyncStorage.getItem('onboardingComplete')
 			]);
 
-			setIsAuthenticated(!!authToken);
-			setShowOnboarding(!onboardingComplete);
-			console.log('Auth token:', authToken);
-			console.log('Onboarding complete:', onboardingComplete);
+			const hasAuthToken = !!authToken;
+			const hasCompletedOnboarding = !!onboardingComplete;
+
+			setIsAuthenticated(hasAuthToken);
+
+			// Solo mostrar onboarding si está autenticado pero no ha completado el onboarding
+			setShowOnboarding(hasAuthToken && !hasCompletedOnboarding);
+
+			console.log('🔍 Estado de autenticación:');
+			console.log('  - Auth token:', hasAuthToken ? '✅' : '❌');
+			console.log('  - Onboarding complete:', hasCompletedOnboarding ? '✅' : '❌');
+			console.log('  - Mostrar onboarding:', hasAuthToken && !hasCompletedOnboarding ? '✅' : '❌');
 		} catch (error) {
 			console.error('Error checking auth state:', error);
 			setIsAuthenticated(false);
-			setShowOnboarding(true);
+			setShowOnboarding(false);
 		}
+	};
+
+	// Función para refrescar el estado después de cambios de autenticación
+	const refreshAuthState = () => {
+		checkAuthAndOnboarding();
 	};
 
 	console.log('Loaded:', loaded);
@@ -53,12 +66,12 @@ export default function RootLayout() {
 
 	if (!isAuthenticated) {
 		console.log('No autenticado, mostrando AuthStack');
-		return <AuthStack onAuthSuccess={() => setIsAuthenticated(true)} />;
+		return <AuthStack onAuthSuccess={refreshAuthState} />;
 	}
 
 	if (showOnboarding) {
 		console.log('Mostrando OnboardingWizard');
-		return <OnboardingWizard onFinish={() => setShowOnboarding(false)} />;
+		return <OnboardingWizard onFinish={refreshAuthState} />;
 	}
 
 	console.log('Mostrando la app principal');

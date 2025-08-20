@@ -4,7 +4,10 @@
 	"version": "1.0.0",
 	"scripts": {
 		"start": "expo start",
-		"reset-project": "node ./scripts/reset-project.js",
+		"clear-auth": "node ./scripts/clear-auth.js",
+		"check-backend": "node ./scripts/check-backend.js",
+		"test-flows": "node ./scripts/test-auth-flows.js",
+		"test-register": "node ./scripts/test-register.js",
 		"android": "expo start --android",
 		"ios": "expo start --ios",
 		"web": "expo start --web",

@@ -1,4 +1,5 @@
 import {Colors} from '@/constants/Colors';
+import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useState} from 'react';
@@ -17,23 +18,18 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-const activitiesList = ['Ciclismo', 'Atletismo', 'Gimnasia', 'Calistenia', 'Fútbol', 'Yoga'];
-
 function isValidEmail(email: string) {
 	return /\S+@\S+\.\S+/.test(email);
 }
-
-function isValidPhone(phone: string) {
-	return /^\d{8,}$/.test(phone);
-}
-
 export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 	const [step, setStep] = useState(0);
 	// Datos personales
 	const [name, setName] = useState('');
 	const [lastName, setLastName] = useState('');
 	const [age, setAge] = useState('');
+	const [birthDate, setBirthDate] = useState('');
 	const [gender, setGender] = useState('');
+	const [phone, setPhone] = useState('');
 	// Datos de ubicación
 	const [country, setCountry] = useState('');
 	const [city, setCity] = useState('');
@@ -46,6 +42,7 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 	// Datos adicionales
 	const [activities, setActivities] = useState<string[]>([]);
 	const [error, setError] = useState('');
+	const [isLoading, setIsLoading] = useState(false);
 
 	const handleNext = async () => {
 		setError('');
@@ -56,7 +53,7 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 				break;
 
 			case 1: // Personal details
-				if (!name.trim() || !lastName.trim() || !age.trim() || !gender) {
+				if (!name.trim() || !lastName.trim() || !age.trim() || !birthDate.trim() || !gender || !phone.trim()) {
 					setError('Por favor completa todos los campos');
 					return;
 				}
@@ -100,29 +97,71 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 				break;
 
 			case 5: // Success screen
+				setIsLoading(true);
 				try {
-					const userData = {
+					console.log('📝 Iniciando registro de usuario desde onboarding...');
+
+					// Preparar datos para el registro
+					const registerData = {
 						name,
 						lastName,
+						email,
+						password,
 						age: Number(age),
-						gender,
+						birthDate,
+						gender: gender as 'male' | 'female' | 'Otro',
+						phone
+					};
+
+					// Registrar usuario en el backend
+					const authResponse = await authService.register(registerData);
+
+					console.log('✅ Usuario registrado exitosamente:', authResponse.user.name);
+
+					// Guardar datos adicionales del onboarding
+					const onboardingData = {
+						...authResponse.user,
 						country,
 						city,
 						postalCode,
 						address,
-						email,
 						activities
 					};
 
-					await AsyncStorage.multiSet([
-						['onboardingComplete', 'true'],
-						['userData', JSON.stringify(userData)],
-						['authToken', 'dummy-token'] // En producción, esto vendría del backend
-					]);
+					// Actualizar datos del usuario con información del onboarding
+					await authService.updateUserData(onboardingData);
 
-					onFinish();
+					// Marcar onboarding como completado
+					await AsyncStorage.setItem('onboardingComplete', 'true');
+
+					console.log('✅ Onboarding completado exitosamente');
+
+					// Refrescar el estado para que _layout.tsx detecte los cambios
+					setTimeout(() => {
+						onFinish();
+					}, 100);
 				} catch (error) {
-					setError(`Error al guardar los datos: ${error}`);
+					console.error('❌ Error en registro desde onboarding:', error);
+
+					let errorMessage = 'Error al crear la cuenta. Por favor intenta de nuevo.';
+
+					if (error instanceof Error) {
+						if (error.message.includes('409')) {
+							errorMessage = 'Ya existe una cuenta con este email.';
+						} else if (error.message.includes('400')) {
+							errorMessage = 'Datos inválidos. Verifica la información ingresada.';
+						} else if (error.message.includes('Network request failed')) {
+							errorMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+						} else if (error.message.includes('500')) {
+							errorMessage = 'Error del servidor. Intenta más tarde.';
+						} else {
+							errorMessage = error.message;
+						}
+					}
+
+					setError(errorMessage);
+				} finally {
+					setIsLoading(false);
 				}
 				break;
 		}
@@ -178,14 +217,33 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 							onChangeText={setAge}
 							keyboardType='numeric'
 						/>
+						<TextInput
+							style={styles.input}
+							placeholder='Fecha de nacimiento (YYYY-MM-DD)'
+							placeholderTextColor={Colors.light.icon}
+							value={birthDate}
+							onChangeText={setBirthDate}
+						/>
+						<TextInput
+							style={styles.input}
+							placeholder='Teléfono'
+							placeholderTextColor={Colors.light.icon}
+							value={phone}
+							onChangeText={setPhone}
+							keyboardType='phone-pad'
+						/>
 						<View style={styles.genderRow}>
-							{['M', 'F', 'Otro'].map((g) => (
+							{[
+								{value: 'male', label: 'M'},
+								{value: 'female', label: 'F'},
+								{value: 'Otro', label: 'Otro'}
+							].map((g) => (
 								<TouchableOpacity
-									key={g}
-									style={[styles.genderButton, gender === g && styles.genderButtonSelected]}
-									onPress={() => setGender(g)}
+									key={g.value}
+									style={[styles.genderButton, gender === g.value && styles.genderButtonSelected]}
+									onPress={() => setGender(g.value)}
 								>
-									<Text style={[styles.genderText, gender === g && styles.genderTextSelected]}>{g}</Text>
+									<Text style={[styles.genderText, gender === g.value && styles.genderTextSelected]}>{g.label}</Text>
 								</TouchableOpacity>
 							))}
 						</View>
@@ -318,8 +376,16 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 									<Text style={styles.backButtonText}>Atrás</Text>
 								</TouchableOpacity>
 							)}
-							<TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-								<Text style={styles.nextButtonText}>{step === 5 ? 'Comenzar' : 'Siguiente'}</Text>
+							<TouchableOpacity
+								style={[styles.nextButton, isLoading && styles.nextButtonDisabled]}
+								onPress={handleNext}
+								disabled={isLoading}
+							>
+								{isLoading ? (
+									<Text style={styles.nextButtonText}>Creando cuenta...</Text>
+								) : (
+									<Text style={styles.nextButtonText}>{step === 5 ? 'Comenzar' : 'Siguiente'}</Text>
+								)}
 							</TouchableOpacity>
 						</View>
 					</ScrollView>
@@ -486,6 +552,9 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontWeight: 'bold',
 		fontSize: 16
+	},
+	nextButtonDisabled: {
+		opacity: 0.6
 	},
 	error: {
 		color: 'red',

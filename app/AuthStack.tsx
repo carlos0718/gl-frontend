@@ -1,8 +1,10 @@
 import {Colors} from '@/constants/Colors';
+import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useState} from 'react';
 import {
+	ActivityIndicator,
+	Alert,
 	Image,
 	Keyboard,
 	KeyboardAvoidingView,
@@ -21,6 +23,7 @@ export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) 
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState('');
+	const [isLoading, setIsLoading] = useState(false);
 
 	const handleLogin = async () => {
 		if (!email.trim() || !password.trim()) {
@@ -28,24 +31,108 @@ export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) 
 			return;
 		}
 
+		// Validación básica de email
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
+			setError('Por favor ingresa un email válido');
+			return;
+		}
+
+		setIsLoading(true);
+		setError('');
+
 		try {
-			// Aquí iría la lógica de autenticación real
-			// Por ahora simulamos un login exitoso
-			await AsyncStorage.setItem('authToken', 'dummy-token');
-			onAuthSuccess();
+			console.log('🔐 Intentando login con:', email);
+
+			const response = await authService.login(email, password);
+
+			console.log('✅ Login exitoso:', response.user.name);
+
+			// Mostrar mensaje de bienvenida y refrescar el estado
+			Alert.alert('¡Bienvenido!', `Hola ${response.user.name}, has iniciado sesión exitosamente.`, [
+				{
+					text: 'OK',
+					onPress: () => {
+						// Refrescar el estado para que _layout.tsx detecte los cambios
+						setTimeout(() => {
+							onAuthSuccess();
+						}, 100);
+					}
+				}
+			]);
 		} catch (error) {
-			setError('Error al iniciar sesión: ' + error);
+			console.error('❌ Error en login:', error);
+
+			let errorMessage = 'Error al iniciar sesión. Por favor intenta de nuevo.';
+
+			if (error instanceof Error) {
+				if (error.message.includes('401')) {
+					errorMessage = 'Email o contraseña incorrectos.';
+				} else if (error.message.includes('Network request failed')) {
+					errorMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+				} else if (error.message.includes('404')) {
+					errorMessage = 'Usuario no encontrado.';
+				} else if (error.message.includes('500')) {
+					errorMessage = 'Error del servidor. Intenta más tarde.';
+				} else {
+					errorMessage = error.message;
+				}
+			}
+
+			setError(errorMessage);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const handleForgotPassword = async () => {
+		if (!email.trim()) {
+			setError('Por favor ingresa tu email para recuperar la contraseña');
+			return;
+		}
+
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
+			setError('Por favor ingresa un email válido');
+			return;
+		}
+
+		setIsLoading(true);
+		setError('');
+
+		try {
+			await authService.forgotPassword(email);
+
+			Alert.alert('Email enviado', 'Se ha enviado un enlace de recuperación a tu email.', [{text: 'OK'}]);
+		} catch (error) {
+			console.error('❌ Error en forgot password:', error);
+
+			let errorMessage = 'Error al enviar el email de recuperación.';
+
+			if (error instanceof Error) {
+				if (error.message.includes('404')) {
+					errorMessage = 'No se encontró una cuenta con este email.';
+				} else if (error.message.includes('Network request failed')) {
+					errorMessage = 'Error de conexión. Verifica tu internet.';
+				}
+			}
+
+			setError(errorMessage);
+		} finally {
+			setIsLoading(false);
 		}
 	};
 
 	const handleRegister = () => {
 		// Limpiar el estado de autenticación y onboarding
-		AsyncStorage.multiRemove(['authToken', 'onboardingComplete', 'userData'])
+		authService
+			.clearAuthData()
 			.then(() => {
 				onAuthSuccess(); // Esto llevará al usuario al onboarding
 			})
 			.catch((error) => {
 				console.error('Error al limpiar el estado:', error);
+				onAuthSuccess(); // Continuar de todas formas
 			});
 	};
 
@@ -75,8 +162,11 @@ export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) 
 								secureTextEntry
 							/>
 							{error ? <Text style={styles.error}>{error}</Text> : null}
-							<TouchableOpacity style={styles.button} onPress={handleLogin}>
-								<Text style={styles.buttonText}>Iniciar Sesión</Text>
+							<TouchableOpacity style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
+								{isLoading ? <ActivityIndicator color='#fff' size='small' /> : <Text style={styles.buttonText}>Iniciar Sesión</Text>}
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.forgotPasswordButton} onPress={handleForgotPassword} disabled={isLoading}>
+								<Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
 							</TouchableOpacity>
 							<View style={styles.divider}>
 								<View style={styles.dividerLine} />
@@ -158,6 +248,18 @@ const styles = StyleSheet.create({
 		color: '#fff',
 		fontWeight: 'bold',
 		fontSize: 16
+	},
+	buttonDisabled: {
+		opacity: 0.6
+	},
+	forgotPasswordButton: {
+		marginTop: 12,
+		padding: 8
+	},
+	forgotPasswordText: {
+		color: Colors.light.tint,
+		fontSize: 14,
+		textDecorationLine: 'underline'
 	},
 	error: {
 		color: 'red',

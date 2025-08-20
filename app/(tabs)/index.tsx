@@ -1,73 +1,39 @@
 import CreateGroupModal from '@/components/CreateGroupModal';
 import EmptyGroupsState from '@/components/EmptyGroupsState';
+import ValidationError from '@/components/ValidationError';
+import {API_CONFIG, validateApiConfig} from '@/config/api';
 import {Colors} from '@/constants/Colors';
-import {Group, GroupService} from '@/services/groupService';
+import {useGroupsValidation} from '@/hooks/useGroupsValidation';
+import {IGroup, INearbyGroupsRequest} from '@/interfaces/group';
+import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {StatusBar} from 'expo-status-bar';
 import React, {useEffect, useState} from 'react';
-import {Alert, FlatList, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {
+	ActivityIndicator,
+	Alert,
+	FlatList,
+	Modal,
+	Pressable,
+	SafeAreaView,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View
+} from 'react-native';
 
 type GooglePlacePrediction = {
 	place_id: string;
 	description: string;
 };
 
-const NEARBY_GROUPS = [
-	{
-		id: 1,
-		name: 'Grupo Crossfit Centro',
-		distance: 3.2,
-		members: 12,
-		address: 'Calle Mayor 10, Centro'
-	},
-	{
-		id: 2,
-		name: 'Yoga en el Parque',
-		distance: 7.8,
-		members: 8,
-		address: 'Parque Retiro, Entrada Norte'
-	},
-	{
-		id: 3,
-		name: 'Running Team Madrid',
-		distance: 12.5,
-		members: 20,
-		address: 'Av. de América 22'
-	},
-	{
-		id: 4,
-		name: 'Grupo Running en el Parque',
-		distance: 10.2,
-		members: 15,
-		address: 'Parque del Retiro, Entrada Norte'
-	},
-	{
-		id: 5,
-		name: 'Grupo Running en el Parque',
-		distance: 10.2,
-		members: 15,
-		address: 'Parque del Retiro, Entrada Norte'
-	},
-	{
-		id: 6,
-		name: 'Grupo Running en el Parque',
-		distance: 10.2,
-		members: 15,
-		address: 'Parque del Retiro, Entrada Norte'
-	},
-	{
-		id: 7,
-		name: 'Grupo Running en el Parque',
-		distance: 10.2,
-		members: 15,
-		address: 'Parque del Retiro, Entrada Norte'
-	}
-];
 const RADIO_OPTIONS = [5, 10, 15, 20, 25, 30];
 
-const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-const GOOGLE_PLACES_API_URL = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_URL;
+// Validar configuración de API al cargar
+validateApiConfig();
 export default function HomeScreen() {
 	const [userAddress, setUserAddress] = useState('');
 	const [suggestions, setSuggestions] = useState<GooglePlacePrediction[]>([]);
@@ -76,14 +42,28 @@ export default function HomeScreen() {
 	const [modalVisible, setModalVisible] = useState(false);
 	const [userName, setUserName] = useState('');
 	const [userInitial, setUserInitial] = useState('');
-	const [groups, setGroups] = useState<Group[]>([]);
-	const [isLoadingGroups, setIsLoadingGroups] = useState(false);
 	const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
 	const [userLocation, setUserLocation] = useState<{
 		latitude: number;
 		longitude: number;
 		address: string;
 	} | null>(null);
+
+	// Función para limpiar autenticación (DEBUG)
+	const clearAuth = async () => {
+		try {
+			await authService.clearAuthData();
+			await AsyncStorage.removeItem('onboardingComplete');
+			Alert.alert('✅ Limpiado', 'Datos de autenticación limpiados. Reinicia la app.');
+		} catch (error) {
+			console.error('Error limpiando auth:', error);
+			Alert.alert('❌ Error', 'Error limpiando datos de autenticación');
+		}
+	};
+	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+	// Hook para validación de grupos
+	const {groups, isLoading: isLoadingGroups, error: groupsError, hasGroups, validateGroups, refreshGroups} = useGroupsValidation();
 
 	useEffect(() => {
 		loadUserData();
@@ -102,16 +82,15 @@ export default function HomeScreen() {
 		}
 	};
 
-	// Usar datos mock para desarrollo - en producción esto vendría de la API
-	const mockGroups = Array.isArray(NEARBY_GROUPS) ? NEARBY_GROUPS : [];
-
 	const fetchSuggestions = async (input: string) => {
 		if (!input) {
 			setSuggestions([]);
 			return;
 		}
 		try {
-			const response = await fetch(`${GOOGLE_PLACES_API_URL}?input=${encodeURIComponent(input)}&key=${GOOGLE_PLACES_API_KEY}&language=es`);
+			const response = await fetch(
+				`${API_CONFIG.GOOGLE_PLACES_API_URL}?input=${encodeURIComponent(input)}&key=${API_CONFIG.GOOGLE_PLACES_API_KEY}&language=es`
+			);
 			const data = await response.json();
 			setSuggestions(data.predictions || []);
 		} catch (err) {
@@ -123,22 +102,28 @@ export default function HomeScreen() {
 	// Función para obtener coordenadas de una dirección usando Google Geocoding API
 	const getCoordinatesFromAddress = async (address: string) => {
 		try {
-			const response = await fetch(
-				`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_PLACES_API_KEY}`
-			);
+			console.log('🔑 API Key configurada:', API_CONFIG.GOOGLE_PLACES_API_KEY ? '✅' : '❌');
+			const url = `${API_CONFIG.GOOGLE_GEOCODING_API_URL}?address=${encodeURIComponent(address)}&key=${API_CONFIG.GOOGLE_PLACES_API_KEY}`;
+			console.log('🌐 URL de geocodificación:', url);
+
+			const response = await fetch(url);
 			const data = await response.json();
+			console.log('📡 Respuesta de geocodificación:', data); //'✅'
 
 			if (data.results && data.results.length > 0) {
 				const location = data.results[0].geometry.location;
-				return {
+				const result = {
 					latitude: location.lat,
 					longitude: location.lng,
 					address: address
 				};
+				console.log('✅ Coordenadas extraídas:', result);
+				return result;
 			}
+			console.log('❌ No se encontraron resultados en la respuesta');
 			return null;
 		} catch (error) {
-			console.error('Error getting coordinates:', error);
+			console.error('❌ Error getting coordinates:', error);
 			return null;
 		}
 	};
@@ -147,50 +132,55 @@ export default function HomeScreen() {
 	const loadNearbyGroups = async () => {
 		if (!userLocation) return;
 
-		setIsLoadingGroups(true);
-		try {
-			const nearbyGroups = await GroupService.getNearbyGroups({
-				latitude: userLocation.latitude,
-				longitude: userLocation.longitude,
-				radius: searchRadius
-			});
-			setGroups(nearbyGroups);
-		} catch (error) {
-			console.error('Error loading nearby groups:', error);
-			// En desarrollo, usar datos mock
-			const mockGroupsConverted: Group[] = mockGroups
-				.filter((g) => (g.distance || 0) <= searchRadius)
-				.map((g) => ({
-					id: g.id.toString(),
-					name: g.name,
-					description: `Grupo de ${g.name}`,
-					address: g.address,
-					latitude: 0, // Mock data
-					longitude: 0, // Mock data
-					distance: g.distance,
-					members: g.members,
-					maxMembers: 20,
-					category: 'Running',
-					createdBy: 'user123',
-					createdAt: new Date().toISOString(),
-					isActive: true
-				}));
-			setGroups(mockGroupsConverted);
-		} finally {
-			setIsLoadingGroups(false);
-		}
+		const params: INearbyGroupsRequest = {
+			latitude: userLocation.latitude,
+			longitude: userLocation.longitude,
+			radius: searchRadius
+		};
+
+		await validateGroups(params);
 	};
 
 	// Función para manejar la selección de ubicación
 	const handleLocationSelect = async (address: string) => {
+		console.log('📍 Seleccionando ubicación:', address);
+		setIsLoadingLocation(true);
 		setUserAddress(address);
 		setShowSuggestions(false);
 
-		const coords = await getCoordinatesFromAddress(address);
-		if (coords) {
-			setUserLocation(coords);
-			// Cargar grupos después de establecer la ubicación
-			setTimeout(() => loadNearbyGroups(), 500);
+		try {
+			const coords = await getCoordinatesFromAddress(address);
+			console.log('📍 Coordenadas obtenidas:', coords);
+			if (coords) {
+				setUserLocation(coords);
+				console.log('📍 Ubicación establecida:', coords); //✅
+				// Cargar grupos después de establecer la ubicación
+				await loadNearbyGroups();
+			} else {
+				console.log('❌ No se pudieron obtener coordenadas, usando coordenadas de prueba');
+				// Fallback para desarrollo - usar coordenadas de Madrid
+				const fallbackCoords = {
+					latitude: 40.4168,
+					longitude: -3.7038,
+					address: address
+				};
+				setUserLocation(fallbackCoords);
+				console.log('📍 Ubicación de fallback establecida:', fallbackCoords);
+				await loadNearbyGroups();
+			}
+		} catch (error) {
+			console.error('❌ Error getting coordinates:', error);
+			// Fallback en caso de error
+			const fallbackCoords = {
+				latitude: 40.4168,
+				longitude: -3.7038,
+				address: address
+			};
+			setUserLocation(fallbackCoords);
+			console.log('📍 Ubicación de fallback establecida por error:', fallbackCoords);
+			await loadNearbyGroups();
+		} finally {
+			setIsLoadingLocation(false);
 		}
 	};
 
@@ -204,8 +194,9 @@ export default function HomeScreen() {
 	};
 
 	// Función para manejar grupo creado
-	const handleGroupCreated = (newGroup: Group) => {
-		setGroups((prevGroups) => [newGroup, ...prevGroups]);
+	const handleGroupCreated = (newGroup: IGroup) => {
+		// Recargar grupos para incluir el nuevo grupo
+		refreshGroups();
 		setShowCreateGroupModal(false);
 	};
 
@@ -247,11 +238,16 @@ export default function HomeScreen() {
 										fetchSuggestions(text);
 									}}
 									placeholderTextColor={Colors.light.tabIconDefault}
+									editable={!isLoadingLocation}
 								/>
 							</View>
-							<TouchableOpacity onPress={() => setModalVisible(true)} style={{marginLeft: 8}}>
-								<Ionicons name='options-outline' size={22} color={Colors.light.tint} />
-							</TouchableOpacity>
+							{isLoadingLocation ? (
+								<ActivityIndicator size='small' color={Colors.light.tint} style={{marginLeft: 8}} />
+							) : (
+								<TouchableOpacity onPress={() => setModalVisible(true)} style={{marginLeft: 8}}>
+									<Ionicons name='options-outline' size={22} color={Colors.light.tint} />
+								</TouchableOpacity>
+							)}
 						</View>
 						{showSuggestions && suggestions.length > 0 && (
 							<FlatList
@@ -308,13 +304,17 @@ export default function HomeScreen() {
 					bounces={true}
 				>
 					<View style={styles.section}>
-						<Text style={styles.sectionTitle}>Grupos cerca de ti ({searchRadius}km)</Text>
+						<View style={styles.sectionHeader}>
+							<Text style={styles.sectionTitle}>Grupos cerca de ti ({searchRadius}km)</Text>
+						</View>
 
 						{isLoadingGroups ? (
 							<View style={styles.loadingContainer}>
 								<Text style={styles.loadingText}>Buscando grupos cercanos...</Text>
 							</View>
-						) : groups.length > 0 ? (
+						) : groupsError ? (
+							<ValidationError error={groupsError} onRetry={refreshGroups} onIncreaseRadius={handleIncreaseRadius} />
+						) : hasGroups ? (
 							groups.map((group) => (
 								<View key={group.id} style={styles.groupCard}>
 									<View style={{flex: 1}}>
@@ -343,6 +343,24 @@ export default function HomeScreen() {
 						)}
 					</View>
 				</ScrollView>
+
+				{/* Botón flotante para crear grupo - solo cuando NO hay grupos */}
+				{userLocation && !hasGroups && !isLoadingGroups && (
+					<TouchableOpacity style={styles.floatingCreateButton} onPress={handleCreateGroup}>
+						<Ionicons name='add' size={24} color={Colors.light.background} />
+					</TouchableOpacity>
+				)}
+				{/* Debug: Mostrar estado de userLocation */}
+				{__DEV__ && (
+					<View style={{position: 'absolute', top: 100, right: 10, backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, borderRadius: 5}}>
+						<Text style={{color: 'white', fontSize: 12}}>userLocation: {userLocation ? '✅' : '❌'}</Text>
+						<Text style={{color: 'white', fontSize: 12}}>hasGroups: {hasGroups ? '✅' : '❌'}</Text>
+						<Text style={{color: 'white', fontSize: 12}}>isLoading: {isLoadingGroups ? '✅' : '❌'}</Text>
+						<TouchableOpacity style={{backgroundColor: 'red', padding: 5, borderRadius: 3, marginTop: 5}} onPress={clearAuth}>
+							<Text style={{color: 'white', fontSize: 10, textAlign: 'center'}}>🧹 Limpiar Auth</Text>
+						</TouchableOpacity>
+					</View>
+				)}
 
 				{/* Modal para crear grupo */}
 				<CreateGroupModal
@@ -464,6 +482,13 @@ const styles = StyleSheet.create({
 		marginBottom: 15,
 		color: Colors.light.text
 	},
+	sectionHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginBottom: 16
+	},
+
 	groupCard: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -588,5 +613,25 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: Colors.light.tabIconDefault,
 		textAlign: 'center'
+	},
+	floatingCreateButton: {
+		position: 'absolute',
+		bottom: 100, // Aumentado para evitar el footer
+		right: 20,
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: Colors.light.tint,
+		justifyContent: 'center',
+		alignItems: 'center',
+		elevation: 10, // Aumentado para estar por encima del footer
+		shadowColor: '#000',
+		shadowOffset: {
+			width: 0,
+			height: 2
+		},
+		shadowOpacity: 0.25,
+		shadowRadius: 3.84,
+		zIndex: 1000 // Asegurar que esté por encima de todo
 	}
 });

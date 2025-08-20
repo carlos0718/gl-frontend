@@ -1,5 +1,6 @@
 import {Colors} from '@/constants/Colors';
 import {ICreateGroupRequest, IGroup} from '@/interfaces/group';
+import {authService} from '@/services/authService';
 import {GroupService} from '@/services/groupService';
 import {Ionicons} from '@expo/vector-icons';
 import React, {useEffect, useState} from 'react';
@@ -47,10 +48,22 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 
 	const loadCategories = async () => {
 		try {
+			console.log('📋 Cargando categorías en el modal...');
+
+			// Verificar estado de autenticación
+			const isAuthenticated = await authService.isAuthenticated();
+			console.log('🔐 Estado de autenticación:', isAuthenticated ? '✅ Autenticado' : '❌ No autenticado');
+
+			if (!isAuthenticated) {
+				console.warn('⚠️ Usuario no autenticado, usando categorías por defecto');
+			}
+
 			const cats = await GroupService.getGroupCategories();
 			setCategories(cats);
+			console.log('✅ Categorías cargadas en el modal:', cats.length, 'categorías');
 		} catch (error) {
-			console.error('Error loading categories:', error);
+			console.error('❌ Error cargando categorías en el modal:', error);
+			// Las categorías por defecto ya están manejadas en GroupService
 		}
 	};
 
@@ -103,7 +116,21 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 			]);
 		} catch (error) {
 			console.error('Error creating group:', error);
-			Alert.alert('Error', 'No se pudo crear el grupo. Por favor intenta de nuevo.');
+			let errorMessage = 'No se pudo crear el grupo. Por favor intenta de nuevo.';
+
+			if (error instanceof Error) {
+				if (error.message.includes('Network request failed')) {
+					errorMessage = 'Error de conexión. Verifica tu conexión a internet e intenta de nuevo.';
+				} else if (error.message.includes('401')) {
+					errorMessage = 'Sesión expirada. Por favor inicia sesión nuevamente.';
+				} else if (error.message.includes('400')) {
+					errorMessage = 'Datos inválidos. Verifica la información ingresada.';
+				} else if (error.message.includes('500')) {
+					errorMessage = 'Error del servidor. Intenta más tarde.';
+				}
+			}
+
+			Alert.alert('Error', errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
@@ -171,6 +198,9 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 								</Text>
 								<Ionicons name={showCategoryPicker ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.light.tint} />
 							</TouchableOpacity>
+
+							{/* Debug info */}
+							{__DEV__ && <Text style={{fontSize: 10, color: 'gray', marginTop: 4}}>Categorías cargadas: {categories.length}</Text>}
 
 							{showCategoryPicker && (
 								<View style={styles.pickerOptions}>
