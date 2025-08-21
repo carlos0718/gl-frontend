@@ -1,7 +1,6 @@
 import {Colors} from '@/constants/Colors';
 import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useState} from 'react';
 import {
 	Image,
@@ -93,13 +92,13 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 					setError('Selecciona al menos una actividad');
 					return;
 				}
-				setStep(5);
-				break;
 
-			case 5: // Success screen
+				// Registrar usuario antes de pasar al step 5
 				setIsLoading(true);
+				setError('');
+
 				try {
-					console.log('📝 Iniciando registro de usuario desde onboarding...');
+					console.log('📝 Registrando usuario antes del step final...');
 
 					// Preparar datos para el registro
 					const registerData = {
@@ -114,34 +113,14 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 					};
 
 					// Registrar usuario en el backend
-					const authResponse = await authService.register(registerData);
+					await authService.register(registerData);
 
-					console.log('✅ Usuario registrado exitosamente:', authResponse.user.name);
+					console.log('✅ Usuario registrado exitosamente, pasando al step de login...');
 
-					// Guardar datos adicionales del onboarding
-					const onboardingData = {
-						...authResponse.user,
-						country,
-						city,
-						postalCode,
-						address,
-						activities
-					};
-
-					// Actualizar datos del usuario con información del onboarding
-					await authService.updateUserData(onboardingData);
-
-					// Marcar onboarding como completado
-					await AsyncStorage.setItem('onboardingComplete', 'true');
-
-					console.log('✅ Onboarding completado exitosamente');
-
-					// Refrescar el estado para que _layout.tsx detecte los cambios
-					setTimeout(() => {
-						onFinish();
-					}, 100);
+					// Pasar al step 5 (login)
+					setStep(5);
 				} catch (error) {
-					console.error('❌ Error en registro desde onboarding:', error);
+					console.error('❌ Error en registro:', error);
 
 					let errorMessage = 'Error al crear la cuenta. Por favor intenta de nuevo.';
 
@@ -152,6 +131,82 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 							errorMessage = 'Datos inválidos. Verifica la información ingresada.';
 						} else if (error.message.includes('Network request failed')) {
 							errorMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+						} else if (error.message.includes('500')) {
+							errorMessage = 'Error del servidor. Intenta más tarde.';
+						} else {
+							errorMessage = error.message;
+						}
+					}
+
+					setError(errorMessage);
+				} finally {
+					setIsLoading(false);
+				}
+				break;
+
+			case 5: // Login screen
+				if (!email.trim() || !password.trim()) {
+					setError('Por favor completa todos los campos');
+					return;
+				}
+
+				// Validación básica de email
+				const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+				if (!emailRegex.test(email)) {
+					setError('Por favor ingresa un email válido');
+					return;
+				}
+
+				setIsLoading(true);
+				setError('');
+
+				try {
+					console.log('🔐 Iniciando sesión desde onboarding...');
+
+					// Hacer login con las credenciales ingresadas
+					const authResponse = await authService.login(email, password);
+
+					console.log('✅ Login exitoso:', authResponse.data.user.name);
+
+					// Preparar datos adicionales del onboarding
+					const additionalData = {
+						name,
+						lastName,
+						age: Number(age),
+						birthDate,
+						gender: gender as 'male' | 'female' | 'Otro',
+						phone,
+						country,
+						city,
+						postalCode,
+						address,
+						activities
+					};
+
+					// Actualizar datos del usuario con información del onboarding
+					await authService.updateUserData({
+						...authResponse.data.user,
+						...additionalData
+					});
+
+					console.log('✅ Onboarding completado exitosamente');
+
+					// Refrescar el estado para que _layout.tsx detecte los cambios
+					setTimeout(() => {
+						onFinish();
+					}, 100);
+				} catch (error) {
+					console.error('❌ Error en login desde onboarding:', error);
+
+					let errorMessage = 'Error al iniciar sesión. Por favor intenta de nuevo.';
+
+					if (error instanceof Error) {
+						if (error.message.includes('401')) {
+							errorMessage = 'Email o contraseña incorrectos.';
+						} else if (error.message.includes('Network request failed')) {
+							errorMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+						} else if (error.message.includes('404')) {
+							errorMessage = 'Usuario no encontrado.';
 						} else if (error.message.includes('500')) {
 							errorMessage = 'Error del servidor. Intenta más tarde.';
 						} else {
@@ -247,6 +302,23 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 								</TouchableOpacity>
 							))}
 						</View>
+
+						<View style={styles.divider}>
+							<View style={styles.dividerLine} />
+							<Text style={styles.dividerText}>ó</Text>
+							<View style={styles.dividerLine} />
+						</View>
+
+						<TouchableOpacity style={styles.socialButton}>
+							<Ionicons name='logo-google' size={24} color={Colors.light.text} style={styles.socialIcon} />
+							<Text style={styles.socialButtonText}>Continuar con Google</Text>
+						</TouchableOpacity>
+						{Platform.OS === 'ios' && (
+							<TouchableOpacity style={styles.socialButton}>
+								<Ionicons name='logo-apple' size={24} color={Colors.light.text} style={styles.socialIcon} />
+								<Text style={styles.socialButtonText}>Continuar con Apple</Text>
+							</TouchableOpacity>
+						)}
 					</View>
 				);
 
@@ -312,21 +384,6 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 								<Ionicons name={showPassword ? 'eye-off' : 'eye'} size={24} color={Colors.light.icon} />
 							</TouchableOpacity>
 						</View>
-						<View style={styles.divider}>
-							<View style={styles.dividerLine} />
-							<Text style={styles.dividerText}>ó</Text>
-							<View style={styles.dividerLine} />
-						</View>
-						<TouchableOpacity style={styles.socialButton}>
-							<Ionicons name='logo-google' size={24} color={Colors.light.text} style={styles.socialIcon} />
-							<Text style={styles.socialButtonText}>Continuar con Google</Text>
-						</TouchableOpacity>
-						{Platform.OS === 'ios' && (
-							<TouchableOpacity style={styles.socialButton}>
-								<Ionicons name='logo-apple' size={24} color={Colors.light.text} style={styles.socialIcon} />
-								<Text style={styles.socialButtonText}>Continuar con Apple</Text>
-							</TouchableOpacity>
-						)}
 					</View>
 				);
 
@@ -355,9 +412,34 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 				return (
 					<View style={styles.stepContainer}>
 						<Image source={require('@/assets/images/logo.png')} style={styles.logo} />
-						<Text style={styles.title}>¡Todo listo!</Text>
-						<Text style={styles.subtitle}>Tu perfil ha sido creado exitosamente</Text>
-						<Text style={styles.description}>Ahora puedes empezar a explorar y conectar con otros deportistas en tu área.</Text>
+						<Text style={styles.title}>¡Perfil creado!</Text>
+						<Text style={styles.subtitle}>Ahora inicia sesión para continuar</Text>
+						<Text style={styles.description}>Tu cuenta ha sido creada exitosamente. Inicia sesión para acceder a tu perfil.</Text>
+
+						<View style={styles.loginContainer}>
+							<TextInput
+								style={styles.input}
+								placeholder='Email'
+								placeholderTextColor={Colors.light.icon}
+								value={email}
+								onChangeText={setEmail}
+								keyboardType='email-address'
+								autoCapitalize='none'
+							/>
+							<View style={styles.passwordContainer}>
+								<TextInput
+									style={[styles.input, styles.passwordInput]}
+									placeholder='Contraseña'
+									placeholderTextColor={Colors.light.icon}
+									value={password}
+									onChangeText={setPassword}
+									secureTextEntry={!showPassword}
+								/>
+								<TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+									<Ionicons name={showPassword ? 'eye-off' : 'eye'} size={24} color={Colors.light.icon} />
+								</TouchableOpacity>
+							</View>
+						</View>
 					</View>
 				);
 		}
@@ -382,9 +464,13 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 								disabled={isLoading}
 							>
 								{isLoading ? (
-									<Text style={styles.nextButtonText}>Creando cuenta...</Text>
+									<Text style={styles.nextButtonText}>
+										{step === 4 ? 'Creando cuenta...' : step === 5 ? 'Iniciando sesión...' : 'Cargando...'}
+									</Text>
 								) : (
-									<Text style={styles.nextButtonText}>{step === 5 ? 'Comenzar' : 'Siguiente'}</Text>
+									<Text style={styles.nextButtonText}>
+										{step === 4 ? 'Crear Cuenta' : step === 5 ? 'Iniciar Sesión' : 'Siguiente'}
+									</Text>
 								)}
 							</TouchableOpacity>
 						</View>
@@ -597,5 +683,9 @@ const styles = StyleSheet.create({
 		color: Colors.light.text,
 		fontWeight: '500',
 		fontSize: 16
+	},
+	loginContainer: {
+		width: '100%',
+		marginTop: 24
 	}
 });

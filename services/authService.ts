@@ -1,5 +1,5 @@
 import {API_CONFIG} from '@/config/api';
-import {IAuthResponse, IUser} from '@/interfaces/user';
+import {IAuthResponse, IRegisterResponse, IUser} from '@/interfaces/user';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import apiService from './apiService';
@@ -38,42 +38,16 @@ export const authService = {
 		try {
 			console.log('🔐 Iniciando sesión para:', email);
 
-			// Verificar si el backend está disponible
-			if (!API_CONFIG.API_URL || API_CONFIG.API_URL.includes('localhost')) {
-				console.warn('⚠️ Backend no configurado o no disponible, usando modo desarrollo');
-
-				// Modo desarrollo: crear usuario simulado
-				const mockUser: IUser = {
-					id: '1',
-					name: 'Usuario',
-					lastName: 'Demo',
-					email: email,
-					age: 25,
-					gender: 'male'
-				};
-
-				const mockResponse: IAuthResponse = {
-					token: 'mock-token-' + Date.now(),
-					user: mockUser
-				};
-
-				// Guardar datos simulados (usuario existente)
-				await this.saveAuthData(mockResponse.token, mockResponse.user, false);
-
-				console.log('✅ Login simulado exitoso para:', email);
-				return mockResponse;
-			}
-
 			const response = await apiService<IAuthResponse>(API_CONFIG.AUTH_ENDPOINTS.LOGIN, {
 				method: 'POST',
 				body: {email, password},
 				needsAuth: false // Login no requiere autenticación previa
 			});
-
+			console.log('🟢 Response Login:', response);
 			// Guardar token y datos del usuario (usuario existente)
-			await this.saveAuthData(response.token, response.user, false);
+			await this.saveAuthData(response.data.token, response.data.user, false);
 
-			console.log('✅ Login exitoso para:', response.user.email);
+			console.log('✅ Login exitoso para:', response.data.user.email);
 			return response;
 		} catch (error) {
 			console.error('❌ Error en login:', error);
@@ -88,39 +62,20 @@ export const authService = {
 	},
 
 	/**
-	 * Registrar nuevo usuario
+	 * Registrar nuevo usuario (solo registro, sin login)
 	 */
-	async register(userData: IRegisterRequest): Promise<IAuthResponse> {
+	async register(userData: IRegisterRequest): Promise<void> {
 		try {
 			console.log('📝 Registrando nuevo usuario:', userData.email);
 
-			const response = await apiService<{success: boolean; message: string; data: any}>(API_CONFIG.AUTH_ENDPOINTS.REGISTER, {
+			// Registrar usuario
+			const registerResponse = await apiService<IRegisterResponse>(API_CONFIG.AUTH_ENDPOINTS.REGISTER, {
 				method: 'POST',
 				body: userData,
 				needsAuth: false // Registro no requiere autenticación previa
 			});
 
-			// El backend devuelve {success: true, message: string, data: userData}
-			// Necesitamos convertir esto al formato IAuthResponse
-			const tempToken = 'temp-token-' + Date.now();
-
-			const authResponse: IAuthResponse = {
-				token: tempToken,
-				user: {
-					id: response.data._id || response.data.id || 'new-user-' + Date.now(),
-					name: response.data.name,
-					lastName: response.data.lastName,
-					email: response.data.email,
-					age: response.data.age,
-					gender: response.data.gender
-				}
-			};
-
-			// Guardar token y datos del usuario (usuario nuevo - sin marcar onboarding)
-			await this.saveAuthData(authResponse.token, authResponse.user, true);
-
-			console.log('✅ Registro exitoso para:', authResponse.user.email);
-			return authResponse;
+			console.log('✅ Usuario registrado exitosamente:', registerResponse.data.email);
 		} catch (error) {
 			console.error('❌ Error en registro:', error);
 			throw error;
@@ -256,7 +211,7 @@ export const authService = {
 				['authToken', token],
 				['userData', JSON.stringify(user)]
 			];
-
+			console.log('💾 Datos de autenticación guardados', dataToSave);
 			// Si es un usuario existente (login), marcar onboarding como completo
 			// Si es un usuario nuevo (registro), el onboarding se marcará después del wizard
 			if (!isNewUser) {
@@ -267,6 +222,33 @@ export const authService = {
 			console.log('💾 Datos de autenticación guardados');
 		} catch (error) {
 			console.error('❌ Error guardando datos de autenticación:', error);
+			throw error;
+		}
+	},
+
+	/**
+	 * Guardar datos completos del onboarding (incluye registro + datos adicionales)
+	 */
+	async saveOnboardingData(authResponse: IAuthResponse, additionalData: any): Promise<void> {
+		try {
+			console.log('💾 Guardando datos completos del onboarding...');
+
+			// Combinar datos del registro con datos adicionales del onboarding
+			const completeUserData = {
+				...authResponse.data.user,
+				...additionalData
+			};
+
+			const dataToSave: [string, string][] = [
+				['authToken', authResponse.data.token],
+				['userData', JSON.stringify(completeUserData)],
+				['onboardingComplete', 'true'] // Marcar onboarding como completo
+			];
+
+			await AsyncStorage.multiSet(dataToSave);
+			console.log('✅ Datos del onboarding guardados exitosamente');
+		} catch (error) {
+			console.error('❌ Error guardando datos del onboarding:', error);
 			throw error;
 		}
 	},

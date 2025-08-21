@@ -1,6 +1,7 @@
 import {Colors} from '@/constants/Colors';
 import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useState} from 'react';
 import {
 	ActivityIndicator,
@@ -46,10 +47,10 @@ export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) 
 
 			const response = await authService.login(email, password);
 
-			console.log('✅ Login exitoso:', response.user.name);
+			console.log('✅ Login exitoso:', response.data.user.name);
 
 			// Mostrar mensaje de bienvenida y refrescar el estado
-			Alert.alert('¡Bienvenido!', `Hola ${response.user.name}, has iniciado sesión exitosamente.`, [
+			Alert.alert('¡Bienvenido!', `Hola ${response.data.user.name}, has iniciado sesión exitosamente.`, [
 				{
 					text: 'OK',
 					onPress: () => {
@@ -123,17 +124,30 @@ export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) 
 		}
 	};
 
-	const handleRegister = () => {
-		// Limpiar el estado de autenticación y onboarding
-		authService
-			.clearAuthData()
-			.then(() => {
-				onAuthSuccess(); // Esto llevará al usuario al onboarding
-			})
-			.catch((error) => {
-				console.error('Error al limpiar el estado:', error);
-				onAuthSuccess(); // Continuar de todas formas
-			});
+	const handleRegister = async () => {
+		console.log('📝 Usuario quiere registrarse, limpiando estado y redirigiendo al onboarding...');
+
+		try {
+			// Limpiar todo el estado y marcar onboarding como incompleto en una sola operación
+			await AsyncStorage.multiRemove(['authToken', 'userData']);
+			await AsyncStorage.setItem('onboardingComplete', 'false');
+			console.log('✅ Estado limpiado y onboarding marcado como incompleto');
+
+			// Verificar que se guardó correctamente
+			const onboardingStatus = await AsyncStorage.getItem('onboardingComplete');
+			console.log('🔍 Verificación - onboardingComplete:', onboardingStatus);
+
+			// Pequeño delay para asegurar que AsyncStorage se actualice
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			// Redirigir al onboarding
+			console.log('🔄 Redirigiendo al onboarding...');
+			onAuthSuccess();
+		} catch (error) {
+			console.error('❌ Error al limpiar el estado:', error);
+			// Continuar de todas formas
+			onAuthSuccess();
+		}
 	};
 
 	return (

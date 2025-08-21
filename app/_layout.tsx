@@ -31,17 +31,13 @@ export default function RootLayout() {
 			]);
 
 			const hasAuthToken = !!authToken;
-			const hasCompletedOnboarding = !!onboardingComplete;
+			const hasCompletedOnboarding = onboardingComplete === 'true';
 
 			setIsAuthenticated(hasAuthToken);
 
-			// Solo mostrar onboarding si está autenticado pero no ha completado el onboarding
-			setShowOnboarding(hasAuthToken && !hasCompletedOnboarding);
-
-			console.log('🔍 Estado de autenticación:');
-			console.log('  - Auth token:', hasAuthToken ? '✅' : '❌');
-			console.log('  - Onboarding complete:', hasCompletedOnboarding ? '✅' : '❌');
-			console.log('  - Mostrar onboarding:', hasAuthToken && !hasCompletedOnboarding ? '✅' : '❌');
+			// Mostrar onboarding si no ha completado el onboarding (usuario nuevo o en proceso)
+			const shouldShowOnboarding = !hasCompletedOnboarding;
+			setShowOnboarding(shouldShowOnboarding);
 		} catch (error) {
 			console.error('Error checking auth state:', error);
 			setIsAuthenticated(false);
@@ -54,19 +50,10 @@ export default function RootLayout() {
 		checkAuthAndOnboarding();
 	};
 
-	console.log('Loaded:', loaded);
-	console.log('isAuthenticated:', isAuthenticated);
-	console.log('showOnboarding:', showOnboarding);
-
 	if (!loaded) {
 		console.log('No se cargaron las fuentes');
 		// Async font loading only occurs in development.
 		return null;
-	}
-
-	if (!isAuthenticated) {
-		console.log('No autenticado, mostrando AuthStack');
-		return <AuthStack onAuthSuccess={refreshAuthState} />;
 	}
 
 	if (showOnboarding) {
@@ -74,7 +61,10 @@ export default function RootLayout() {
 		return <OnboardingWizard onFinish={refreshAuthState} />;
 	}
 
-	console.log('Mostrando la app principal');
+	if (!isAuthenticated) {
+		console.log('No autenticado, mostrando AuthStack');
+		return <AuthStack onAuthSuccess={refreshAuthState} />;
+	}
 	return (
 		<ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
 			<Stack>

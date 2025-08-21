@@ -41,7 +41,7 @@ async function apiService<T>(endpoint: string, options: RequestOptions = {}): Pr
 		console.log('📡 Request config:', {method, headers, body});
 
 		const response = await fetch(fullUrl, config);
-
+		console.log('🟢 Response:', response);
 		if (!response.ok) {
 			const errorData = await response.json().catch(() => ({message: 'Error desconocido en la API'}));
 

@@ -5,8 +5,7 @@ export const API_CONFIG = {
 	GOOGLE_PLACES_API_URL: process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_URL || 'https://maps.googleapis.com/maps/api/place/autocomplete/json',
 	GOOGLE_GEOCODING_API_URL: process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_URL || 'https://maps.googleapis.com/maps/api/geocode/json',
 	// Backend API
-	API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api',
-
+	API_URL: process.env.EXPO_PUBLIC_API_URL_REDIRECT || process.env.EXPO_PUBLIC_API_URL,
 	// Endpoints de grupos
 	GROUPS_ENDPOINTS: {
 		NEARBY: 'groups/nearby',

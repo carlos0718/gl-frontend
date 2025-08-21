@@ -11,6 +11,16 @@ export interface IUser {
 
 // Interfaz para la respuesta de la API de login
 export interface IAuthResponse {
-	token: string;
-	user: IUser;
+	success: boolean;
+	message: string;
+	data: {
+		token: string;
+		user: IUser;
+	};
+}
+
+export interface IRegisterResponse {
+	success: boolean;
+	message: string;
+	data: IUser;
 }
