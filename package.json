@@ -1,7 +1,7 @@
 {
 	"name": "gimnasio-libre",
 	"main": "expo-router/entry",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"scripts": {
 		"start": "expo start",
 		"clear-auth": "node ./scripts/clear-auth.js",

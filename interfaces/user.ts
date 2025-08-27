@@ -6,6 +6,7 @@ export interface IUser {
 	email: string;
 	age?: number;
 	gender?: 'male' | 'female' | 'Otro';
+	doneOnboarding?: boolean; // Campo para indicar si el usuario completó el onboarding
 	// ... puedes agregar más campos que necesites en el frontend
 }
 

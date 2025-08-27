@@ -1,5 +1,3 @@
-import {Colors} from '@/constants/Colors';
-import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
 import React, {useState} from 'react';
 import {
@@ -16,6 +14,10 @@ import {
 	View
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+
+import {Colors} from '../constants/Colors';
+import {authService} from '../services/authService';
+import {storageService} from '../services/storageService';
 
 function isValidEmail(email: string) {
 	return /\S+@\S+\.\S+/.test(email);
@@ -183,11 +185,17 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 						activities
 					};
 
+					// Marcar onboarding como completado en el backend
+					await authService.markOnboardingComplete();
+
 					// Actualizar datos del usuario con información del onboarding
-					await authService.updateUserData({
+					const updatedUserData = {
 						...authResponse.data.user,
-						...additionalData
-					});
+						...additionalData,
+						doneOnboarding: true
+					};
+					await storageService.updateUserData(updatedUserData);
+					await storageService.markOnboardingComplete();
 
 					console.log('✅ Onboarding completado exitosamente');
 
@@ -237,7 +245,7 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 			case 0:
 				return (
 					<View style={styles.stepContainer}>
-						<Image source={require('@/assets/images/logo.png')} style={styles.logo} />
+						<Image source={require('../assets/images/logo.png')} style={styles.logo} />
 						<Text style={styles.title}>¡Bienvenido a Gimnasio Libre!</Text>
 						<Text style={styles.subtitle}>Tu espacio para entrenar y conectar</Text>
 						<Text style={styles.description}>
@@ -411,7 +419,7 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 			case 5:
 				return (
 					<View style={styles.stepContainer}>
-						<Image source={require('@/assets/images/logo.png')} style={styles.logo} />
+						<Image source={require('../assets/images/logo.png')} style={styles.logo} />
 						<Text style={styles.title}>¡Perfil creado!</Text>
 						<Text style={styles.subtitle}>Ahora inicia sesión para continuar</Text>
 						<Text style={styles.description}>Tu cuenta ha sido creada exitosamente. Inicia sesión para acceder a tu perfil.</Text>

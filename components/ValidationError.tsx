@@ -1,7 +1,8 @@
-import {Colors} from '@/constants/Colors';
 import {Ionicons} from '@expo/vector-icons';
 import React from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+
+import {Colors} from '../constants/Colors';
 
 interface ValidationErrorProps {
 	error: string;

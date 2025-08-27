@@ -30,3 +30,8 @@ export interface INearbyGroupsRequest {
 	radius: number;
 	category?: string;
 }
+
+export interface IGroupCategoriesResponse {
+	message: string;
+	data: string[];
+}

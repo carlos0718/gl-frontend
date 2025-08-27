@@ -1,6 +1,7 @@
-import {IGroup, INearbyGroupsRequest} from '@/interfaces/group';
-import {GroupService} from '@/services/groupService';
 import {useCallback, useState} from 'react';
+
+import {IGroup, INearbyGroupsRequest} from '../interfaces/group';
+import {GroupService} from '../services/groupService';
 
 interface UseGroupsValidationReturn {
 	groups: IGroup[];

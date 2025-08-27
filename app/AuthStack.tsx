@@ -1,7 +1,4 @@
-import {Colors} from '@/constants/Colors';
-import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {useState} from 'react';
 import {
 	ActivityIndicator,
@@ -19,6 +16,10 @@ import {
 	View
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+
+import {Colors} from '../constants/Colors';
+import {authService} from '../services/authService';
+import {storageService} from '../services/storageService';
 
 export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) {
 	const [email, setEmail] = useState('');
@@ -128,13 +129,13 @@ export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) 
 		console.log('📝 Usuario quiere registrarse, limpiando estado y redirigiendo al onboarding...');
 
 		try {
-			// Limpiar todo el estado y marcar onboarding como incompleto en una sola operación
-			await AsyncStorage.multiRemove(['authToken', 'userData']);
-			await AsyncStorage.setItem('onboardingComplete', 'false');
+			// Limpiar todo el estado y marcar onboarding como incompleto
+			await storageService.clearAuthData();
+			await storageService.clearOnboardingStatus();
 			console.log('✅ Estado limpiado y onboarding marcado como incompleto');
 
 			// Verificar que se guardó correctamente
-			const onboardingStatus = await AsyncStorage.getItem('onboardingComplete');
+			const onboardingStatus = await storageService.isOnboardingComplete();
 			console.log('🔍 Verificación - onboardingComplete:', onboardingStatus);
 
 			// Pequeño delay para asegurar que AsyncStorage se actualice
@@ -156,7 +157,7 @@ export default function AuthStack({onAuthSuccess}: {onAuthSuccess: () => void}) 
 				<SafeAreaView style={styles.container}>
 					<ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps='handled' showsVerticalScrollIndicator={false}>
 						<View style={styles.centered}>
-							<Image source={require('@/assets/images/logo.png')} style={styles.logo} />
+							<Image source={require('../assets/images/logo.png')} style={styles.logo} />
 							<Text style={styles.title}>Bienvenido</Text>
 							<TextInput
 								style={styles.input}

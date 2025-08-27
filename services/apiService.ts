@@ -1,5 +1,8 @@
-import {API_CONFIG} from '@/config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import {API_CONFIG} from '../config/api';
+import {emitAuthEvent} from './authEventEmitter';
+import {authService} from './authService';
 
 const API_URL = API_CONFIG.API_URL;
 
@@ -48,6 +51,18 @@ async function apiService<T>(endpoint: string, options: RequestOptions = {}): Pr
 			// Manejo específico de errores de autenticación
 			if (response.status === 401) {
 				console.error('🔐 Error de autenticación:', errorData);
+
+				// Limpiar datos de autenticación automáticamente
+				try {
+					await authService.clearAuthData();
+					console.log('🗑️ Datos de autenticación limpiados automáticamente');
+
+					// Emitir evento de token expirado para notificar a la app
+					emitAuthEvent('tokenExpired');
+				} catch (clearError) {
+					console.error('❌ Error limpiando datos de auth:', clearError);
+				}
+
 				throw new Error('401 - Sesión expirada o token inválido. Por favor inicia sesión nuevamente.');
 			} else if (response.status === 403) {
 				console.error('🚫 Error de autorización:', errorData);

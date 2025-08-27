@@ -1,10 +1,11 @@
-import {Colors} from '@/constants/Colors';
 import {Ionicons} from '@expo/vector-icons';
 import {Tabs} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
 import React from 'react';
 import {Platform, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+
+import {Colors} from '../../constants/Colors';
 
 export default function TabLayout() {
 	return (

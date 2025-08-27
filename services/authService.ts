@@ -1,8 +1,7 @@
-import {API_CONFIG} from '@/config/api';
-import {IAuthResponse, IRegisterResponse, IUser} from '@/interfaces/user';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import {API_CONFIG} from '../config/api';
+import {IAuthResponse, IRegisterResponse, IUser} from '../interfaces/user';
 import apiService from './apiService';
+import {storageService} from './storageService';
 
 // Interfaz para el registro
 export interface IRegisterRequest {
@@ -45,7 +44,7 @@ export const authService = {
 			});
 			console.log('🟢 Response Login:', response);
 			// Guardar token y datos del usuario (usuario existente)
-			await this.saveAuthData(response.data.token, response.data.user, false);
+			await storageService.saveAuthData(response.data.token, response.data.user);
 
 			console.log('✅ Login exitoso para:', response.data.user.email);
 			return response;
@@ -100,13 +99,13 @@ export const authService = {
 			}
 
 			// Limpiar datos locales
-			await this.clearAuthData();
+			await storageService.clearAuthData();
 
 			console.log('✅ Logout exitoso');
 		} catch (error) {
 			console.error('❌ Error en logout:', error);
 			// Aún así limpiamos los datos locales
-			await this.clearAuthData();
+			await storageService.clearAuthData();
 			throw error;
 		}
 	},
@@ -115,51 +114,28 @@ export const authService = {
 	 * Verificar si el usuario está autenticado
 	 */
 	async isAuthenticated(): Promise<boolean> {
-		try {
-			const token = await AsyncStorage.getItem('authToken');
-			return !!token;
-		} catch (error) {
-			console.error('❌ Error verificando autenticación:', error);
-			return false;
-		}
+		return await storageService.isAuthenticated();
 	},
 
 	/**
 	 * Obtener el token actual
 	 */
 	async getToken(): Promise<string | null> {
-		try {
-			return await AsyncStorage.getItem('authToken');
-		} catch (error) {
-			console.error('❌ Error obteniendo token:', error);
-			return null;
-		}
+		return await storageService.getAuthToken();
 	},
 
 	/**
 	 * Obtener datos del usuario actual
 	 */
 	async getCurrentUser(): Promise<IUser | null> {
-		try {
-			const userData = await AsyncStorage.getItem('userData');
-			return userData ? JSON.parse(userData) : null;
-		} catch (error) {
-			console.error('❌ Error obteniendo datos del usuario:', error);
-			return null;
-		}
+		return await storageService.getCurrentUser();
 	},
 
 	/**
 	 * Actualizar datos del usuario
 	 */
 	async updateUserData(userData: IUser): Promise<void> {
-		try {
-			await AsyncStorage.setItem('userData', JSON.stringify(userData));
-			console.log('✅ Datos del usuario actualizados');
-		} catch (error) {
-			console.error('❌ Error actualizando datos del usuario:', error);
-			throw error;
-		}
+		await storageService.updateUserData(userData);
 	},
 
 	/**
@@ -203,52 +179,30 @@ export const authService = {
 	},
 
 	/**
-	 * Guardar datos de autenticación
+	 * Marcar onboarding como completado en el backend
 	 */
-	async saveAuthData(token: string, user: IUser, isNewUser: boolean = false): Promise<void> {
+	async markOnboardingComplete(): Promise<void> {
 		try {
-			const dataToSave: [string, string][] = [
-				['authToken', token],
-				['userData', JSON.stringify(user)]
-			];
-			console.log('💾 Datos de autenticación guardados', dataToSave);
-			// Si es un usuario existente (login), marcar onboarding como completo
-			// Si es un usuario nuevo (registro), el onboarding se marcará después del wizard
-			if (!isNewUser) {
-				dataToSave.push(['onboardingComplete', 'true']);
+			console.log('✅ Marcando onboarding como completado en el backend...');
+
+			// Obtener el usuario actual para tener el ID
+			const currentUser = await storageService.getCurrentUser();
+			if (!currentUser?.id) {
+				throw new Error('No se pudo obtener el ID del usuario actual');
 			}
 
-			await AsyncStorage.multiSet(dataToSave);
-			console.log('💾 Datos de autenticación guardados');
+			await apiService(API_CONFIG.AUTH_ENDPOINTS.MARK_ONBOARDING_COMPLETE, {
+				method: 'PUT',
+				body: {
+					userId: currentUser.id,
+					doneOnboarding: true
+				},
+				needsAuth: true
+			});
+
+			console.log('✅ Onboarding marcado como completado exitosamente');
 		} catch (error) {
-			console.error('❌ Error guardando datos de autenticación:', error);
-			throw error;
-		}
-	},
-
-	/**
-	 * Guardar datos completos del onboarding (incluye registro + datos adicionales)
-	 */
-	async saveOnboardingData(authResponse: IAuthResponse, additionalData: any): Promise<void> {
-		try {
-			console.log('💾 Guardando datos completos del onboarding...');
-
-			// Combinar datos del registro con datos adicionales del onboarding
-			const completeUserData = {
-				...authResponse.data.user,
-				...additionalData
-			};
-
-			const dataToSave: [string, string][] = [
-				['authToken', authResponse.data.token],
-				['userData', JSON.stringify(completeUserData)],
-				['onboardingComplete', 'true'] // Marcar onboarding como completo
-			];
-
-			await AsyncStorage.multiSet(dataToSave);
-			console.log('✅ Datos del onboarding guardados exitosamente');
-		} catch (error) {
-			console.error('❌ Error guardando datos del onboarding:', error);
+			console.error('❌ Error marcando onboarding como completado:', error);
 			throw error;
 		}
 	},
@@ -257,12 +211,6 @@ export const authService = {
 	 * Limpiar datos de autenticación
 	 */
 	async clearAuthData(): Promise<void> {
-		try {
-			await AsyncStorage.multiRemove(['authToken', 'userData', 'onboardingComplete']);
-			console.log('🗑️ Datos de autenticación limpiados');
-		} catch (error) {
-			console.error('❌ Error limpiando datos de autenticación:', error);
-			throw error;
-		}
+		await storageService.clearAuthData();
 	}
 };

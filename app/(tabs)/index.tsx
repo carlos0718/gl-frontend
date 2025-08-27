@@ -1,11 +1,3 @@
-import CreateGroupModal from '@/components/CreateGroupModal';
-import EmptyGroupsState from '@/components/EmptyGroupsState';
-import ValidationError from '@/components/ValidationError';
-import {API_CONFIG, validateApiConfig} from '@/config/api';
-import {Colors} from '@/constants/Colors';
-import {useGroupsValidation} from '@/hooks/useGroupsValidation';
-import {IGroup, INearbyGroupsRequest} from '@/interfaces/group';
-import {authService} from '@/services/authService';
 import {Ionicons} from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {StatusBar} from 'expo-status-bar';
@@ -24,6 +16,15 @@ import {
 	TouchableOpacity,
 	View
 } from 'react-native';
+
+import CreateGroupModal from '../../components/CreateGroupModal';
+import EmptyGroupsState from '../../components/EmptyGroupsState';
+import ValidationError from '../../components/ValidationError';
+import {API_CONFIG, validateApiConfig} from '../../config/api';
+import {Colors} from '../../constants/Colors';
+import {useGroupsValidation} from '../../hooks/useGroupsValidation';
+import {IGroup, INearbyGroupsRequest} from '../../interfaces/group';
+import {authService} from '../../services/authService';
 
 type GooglePlacePrediction = {
 	place_id: string;

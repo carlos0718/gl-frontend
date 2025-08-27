@@ -1,7 +1,7 @@
-import {API_CONFIG} from '@/config/api';
-import {ICreateGroupRequest, IGroup, INearbyGroupsRequest} from '@/interfaces/group';
-
+import {API_CONFIG} from '../config/api';
+import {ICreateGroupRequest, IGroup, INearbyGroupsRequest} from '../interfaces/group';
 import apiService from './apiService';
+import {CategoriesService} from './categoriesService';
 
 export class GroupService {
 	// Obtener grupos cercanos
@@ -60,62 +60,26 @@ export class GroupService {
 			throw error;
 		}
 	}
-
 	// Obtener categorías de grupos disponibles
 	static async getGroupCategories(): Promise<string[]> {
 		try {
-			console.log('📋 Obteniendo categorías de grupos...');
-
-			// Intentar primero con autenticación
-			try {
-				const categories = await apiService<string[]>(API_CONFIG.GROUPS_ENDPOINTS.CATEGORIES, {
-					method: 'GET',
-					needsAuth: true
-				});
-
-				console.log('✅ Categorías obtenidas exitosamente (con auth):', categories);
-				return categories;
-			} catch (authError) {
-				console.log('⚠️ Error con autenticación, intentando sin auth...', authError);
-
-				// Si falla con autenticación, intentar sin ella
-				const categories = await apiService<string[]>(API_CONFIG.GROUPS_ENDPOINTS.CATEGORIES, {
-					method: 'GET',
-					needsAuth: false
-				});
-
-				console.log('✅ Categorías obtenidas exitosamente (sin auth):', categories);
-				return categories;
-			}
+			console.log('📋 GroupService: Delegando obtención de categorías al CategoriesService...');
+			return await CategoriesService.getCategories();
 		} catch (error) {
-			console.error('❌ Error obteniendo categorías:', error);
-			console.log('🔄 Usando categorías por defecto...');
-
-			// Retornar categorías por defecto en caso de error
-			const defaultCategories = [
-				'Running',
-				'Crossfit',
-				'Yoga',
-				'Fútbol',
-				'Baloncesto',
-				'Natación',
+			console.error('❌ GroupService: Error obteniendo categorías:', error);
+			// El CategoriesService ya maneja el fallback, pero por si acaso
+			return [
+				'Fitness y Ejercicio',
+				'Running y Atletismo',
+				'Deportes de Equipo',
+				'Yoga y Meditación',
+				'Natación y Deportes Acuáticos',
 				'Ciclismo',
-				'Gimnasio',
-				'Calistenia',
-				'Tenis',
-				'Paddle',
-				'Voleibol',
-				'Atletismo',
-				'Boxeo',
-				'Kickboxing',
-				'Pilates',
-				'Danza',
-				'Esquí',
-				'Snowboard',
+				'Artes Marciales',
+				'Baile y Danza',
+				'Deportes de Aventura',
 				'Otros'
 			];
-
-			return defaultCategories;
 		}
 	}
 }

@@ -22,7 +22,8 @@ export const API_CONFIG = {
 		FORGOT_PASSWORD: 'auth/forgot-password',
 		CHANGE_PASSWORD: 'auth/change-password',
 		REFRESH_TOKEN: 'auth/refresh-token',
-		VERIFY_TOKEN: 'auth/verify-token'
+		VERIFY_TOKEN: 'auth/verify-token',
+		MARK_ONBOARDING_COMPLETE: 'auth/update-onboarding'
 	}
 };
 

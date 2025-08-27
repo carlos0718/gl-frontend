@@ -1,7 +1,3 @@
-import {Colors} from '@/constants/Colors';
-import {ICreateGroupRequest, IGroup} from '@/interfaces/group';
-import {authService} from '@/services/authService';
-import {GroupService} from '@/services/groupService';
 import {Ionicons} from '@expo/vector-icons';
 import React, {useEffect, useState} from 'react';
 import {
@@ -17,6 +13,11 @@ import {
 	TouchableOpacity,
 	View
 } from 'react-native';
+
+import {Colors} from '../constants/Colors';
+import {ICreateGroupRequest, IGroup} from '../interfaces/group';
+import {CategoriesService} from '../services/categoriesService';
+import {GroupService} from '../services/groupService';
 
 interface CreateGroupModalProps {
 	visible: boolean;
@@ -48,22 +49,23 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 
 	const loadCategories = async () => {
 		try {
-			console.log('📋 Cargando categorías en el modal...');
+			console.log('📋 CreateGroupModal: Cargando categorías...');
 
-			// Verificar estado de autenticación
-			const isAuthenticated = await authService.isAuthenticated();
-			console.log('🔐 Estado de autenticación:', isAuthenticated ? '✅ Autenticado' : '❌ No autenticado');
+			// Usar el nuevo CategoriesService que maneja cache y fallbacks automáticamente
+			const cats = await CategoriesService.getCategories();
 
-			if (!isAuthenticated) {
-				console.warn('⚠️ Usuario no autenticado, usando categorías por defecto');
+			// Validación adicional antes de setear
+			if (Array.isArray(cats) && cats.length > 0) {
+				setCategories(cats);
+				console.log('✅ CreateGroupModal: Categorías cargadas exitosamente:', cats.length, 'categorías');
+			} else {
+				console.warn('⚠️ CreateGroupModal: No se obtuvieron categorías válidas, usando fallback');
+				setCategories([]);
 			}
-
-			const cats = await GroupService.getGroupCategories();
-			setCategories(cats);
-			console.log('✅ Categorías cargadas en el modal:', cats.length, 'categorías');
 		} catch (error) {
-			console.error('❌ Error cargando categorías en el modal:', error);
-			// Las categorías por defecto ya están manejadas en GroupService
+			console.error('❌ CreateGroupModal: Error cargando categorías:', error);
+			// El CategoriesService ya maneja el fallback, pero por si acaso
+			setCategories([]);
 		}
 	};
 
@@ -190,8 +192,9 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 						</View>
 
 						{/* Categoría */}
-						<View style={styles.inputContainer}>
+						<View style={[styles.inputContainer, showCategoryPicker && styles.inputContainerActive]}>
 							<Text style={styles.label}>Categoría *</Text>
+
 							<TouchableOpacity style={styles.pickerButton} onPress={() => setShowCategoryPicker(!showCategoryPicker)}>
 								<Text style={[styles.pickerButtonText, !category && styles.placeholderText]}>
 									{category || 'Selecciona una categoría'}
@@ -199,24 +202,46 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 								<Ionicons name={showCategoryPicker ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.light.tint} />
 							</TouchableOpacity>
 
-							{/* Debug info */}
-							{__DEV__ && <Text style={{fontSize: 10, color: 'gray', marginTop: 4}}>Categorías cargadas: {categories.length}</Text>}
-
 							{showCategoryPicker && (
-								<View style={styles.pickerOptions}>
-									{categories.map((cat) => (
-										<TouchableOpacity
-											key={cat}
-											style={styles.pickerOption}
-											onPress={() => {
-												setCategory(cat);
-												setShowCategoryPicker(false);
-											}}
+								<>
+									{/* Overlay simple para cerrar */}
+									<TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowCategoryPicker(false)} />
+									<View style={styles.pickerOptionsContainer}>
+										{/* ScrollView con todas las categorías */}
+										<ScrollView
+											style={styles.pickerOptions}
+											showsVerticalScrollIndicator={true}
+											nestedScrollEnabled={true}
+											keyboardShouldPersistTaps='handled'
 										>
-											<Text style={styles.pickerOptionText}>{cat}</Text>
-										</TouchableOpacity>
-									))}
-								</View>
+											{Array.isArray(categories) && categories.length > 0 ? (
+												categories.map((cat, index) => (
+													<TouchableOpacity
+														key={cat}
+														style={[
+															styles.pickerOption,
+															index === categories.length - 1 && styles.pickerOptionLast,
+															category === cat && styles.pickerOptionSelected
+														]}
+														onPress={() => {
+															setCategory(cat);
+															setShowCategoryPicker(false);
+														}}
+														activeOpacity={0.7}
+													>
+														<Text style={[styles.pickerOptionText, category === cat && styles.pickerOptionTextSelected]}>
+															{cat}
+														</Text>
+													</TouchableOpacity>
+												))
+											) : (
+												<TouchableOpacity style={[styles.pickerOption, styles.pickerOptionLast]}>
+													<Text style={styles.pickerOptionText}>No hay categorías disponibles</Text>
+												</TouchableOpacity>
+											)}
+										</ScrollView>
+									</View>
+								</>
 							)}
 						</View>
 
@@ -299,7 +324,13 @@ const styles = StyleSheet.create({
 		padding: 20
 	},
 	inputContainer: {
-		marginBottom: 20
+		marginBottom: 20,
+		position: 'relative',
+		zIndex: 1
+	},
+	inputContainerActive: {
+		zIndex: 10000,
+		elevation: 15
 	},
 	label: {
 		fontSize: 16,
@@ -337,22 +368,59 @@ const styles = StyleSheet.create({
 	placeholderText: {
 		color: Colors.light.tabIconDefault
 	},
-	pickerOptions: {
+	pickerOverlay: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		zIndex: 9998
+	},
+	pickerOptionsContainer: {
+		position: 'absolute',
+		top: '100%',
+		left: 0,
+		right: 0,
 		marginTop: 5,
 		borderWidth: 1,
 		borderColor: Colors.light.tabIconDefault,
 		borderRadius: 10,
 		backgroundColor: Colors.light.background,
-		maxHeight: 200
+		maxHeight: 200,
+		overflow: 'hidden',
+		elevation: 10, // Android shadow más alta
+		shadowColor: '#000', // iOS shadow
+		shadowOffset: {
+			width: 0,
+			height: 4
+		},
+		shadowOpacity: 0.25,
+		shadowRadius: 8,
+		zIndex: 9999
+	},
+	pickerOptions: {
+		flex: 1
 	},
 	pickerOption: {
 		padding: 12,
 		borderBottomWidth: 1,
-		borderBottomColor: Colors.light.tabIconDefault
+		borderBottomColor: Colors.light.tabIconDefault,
+		backgroundColor: Colors.light.background
+	},
+	pickerOptionLast: {
+		borderBottomWidth: 0
+	},
+	pickerOptionSelected: {
+		backgroundColor: Colors.light.tint + '20', // 20% opacity
+		borderBottomColor: Colors.light.tint + '40'
 	},
 	pickerOptionText: {
 		fontSize: 16,
 		color: Colors.light.text
+	},
+	pickerOptionTextSelected: {
+		color: Colors.light.tint,
+		fontWeight: '600'
 	},
 	maxMembersContainer: {
 		flexDirection: 'row',
