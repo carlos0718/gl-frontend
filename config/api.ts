@@ -11,7 +11,7 @@ export const API_CONFIG = {
 		NEARBY: 'groups/nearby',
 		CREATE: 'groups',
 		DETAILS: (groupId: string) => `groups/${groupId}`,
-		CATEGORIES: 'groups/categories'
+		CATEGORIES: 'categories'
 	},
 
 	// Endpoints de autenticación
@@ -22,7 +22,6 @@ export const API_CONFIG = {
 		FORGOT_PASSWORD: 'auth/forgot-password',
 		CHANGE_PASSWORD: 'auth/change-password',
 		REFRESH_TOKEN: 'auth/refresh-token',
-		VERIFY_TOKEN: 'auth/verify-token',
 		MARK_ONBOARDING_COMPLETE: 'auth/update-onboarding'
 	}
 };

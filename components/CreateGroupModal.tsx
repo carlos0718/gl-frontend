@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import {Colors} from '../constants/Colors';
+import {ICategory} from '../interfaces/category';
 import {ICreateGroupRequest, IGroup} from '../interfaces/group';
 import {CategoriesService} from '../services/categoriesService';
 import {GroupService} from '../services/groupService';
@@ -53,11 +54,34 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 
 			// Usar el nuevo CategoriesService que maneja cache y fallbacks automáticamente
 			const cats = await CategoriesService.getCategories();
-
+			console.log('🔍 CreateGroupModal: Categorías cargadas:', cats);
 			// Validación adicional antes de setear
 			if (Array.isArray(cats) && cats.length > 0) {
-				setCategories(cats);
-				console.log('✅ CreateGroupModal: Categorías cargadas exitosamente:', cats.length, 'categorías');
+				// Extraer los nombres de las categorías de los objetos
+				const validCategories = cats
+					.filter((cat) => cat != null && cat !== undefined)
+					.map((cat) => {
+						// Si es un objeto con propiedad name, extraer el nombre
+						if (typeof cat === 'object' && cat !== null && 'name' in cat) {
+							const categoryObj = cat as ICategory;
+							return typeof categoryObj.name === 'string' ? categoryObj.name.trim() : '';
+						}
+						// Si es un string directo, usarlo
+						if (typeof cat === 'string') {
+							return cat.trim();
+						}
+						// Fallback
+						return String(cat);
+					})
+					.filter((catName) => catName.length > 0);
+
+				if (validCategories.length > 0) {
+					setCategories(validCategories);
+					console.log('✅ CreateGroupModal: Categorías cargadas exitosamente:', validCategories.length, 'categorías');
+				} else {
+					console.warn('⚠️ CreateGroupModal: No se obtuvieron categorías válidas después del filtrado');
+					setCategories([]);
+				}
 			} else {
 				console.warn('⚠️ CreateGroupModal: No se obtuvieron categorías válidas, usando fallback');
 				setCategories([]);
@@ -215,25 +239,36 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 											keyboardShouldPersistTaps='handled'
 										>
 											{Array.isArray(categories) && categories.length > 0 ? (
-												categories.map((cat, index) => (
-													<TouchableOpacity
-														key={cat}
-														style={[
-															styles.pickerOption,
-															index === categories.length - 1 && styles.pickerOptionLast,
-															category === cat && styles.pickerOptionSelected
-														]}
-														onPress={() => {
-															setCategory(cat);
-															setShowCategoryPicker(false);
-														}}
-														activeOpacity={0.7}
-													>
-														<Text style={[styles.pickerOptionText, category === cat && styles.pickerOptionTextSelected]}>
-															{cat}
-														</Text>
-													</TouchableOpacity>
-												))
+												categories.map((cat, index) => {
+													// cat ya es un string (el nombre de la categoría)
+													const categoryText = typeof cat === 'string' ? cat : String(cat);
+													const uniqueKey = `category-${index}-${categoryText}`;
+
+													return (
+														<TouchableOpacity
+															key={uniqueKey}
+															style={[
+																styles.pickerOption,
+																index === categories.length - 1 && styles.pickerOptionLast,
+																category === categoryText && styles.pickerOptionSelected
+															]}
+															onPress={() => {
+																setCategory(categoryText);
+																setShowCategoryPicker(false);
+															}}
+															activeOpacity={0.7}
+														>
+															<Text
+																style={[
+																	styles.pickerOptionText,
+																	category === categoryText && styles.pickerOptionTextSelected
+																]}
+															>
+																{categoryText}
+															</Text>
+														</TouchableOpacity>
+													);
+												})
 											) : (
 												<TouchableOpacity style={[styles.pickerOption, styles.pickerOptionLast]}>
 													<Text style={styles.pickerOptionText}>No hay categorías disponibles</Text>

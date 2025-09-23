@@ -1,5 +1,3 @@
-import {API_CONFIG} from '../config/api';
-import apiService from './apiService';
 import {storageService} from './storageService';
 
 interface TokenValidationResult {
@@ -14,55 +12,38 @@ interface TokenValidationResult {
  */
 export class TokenValidator {
 	/**
-	 * Valida si el token actual es válido haciendo una petición al servidor
+	 * Valida si el token actual es válido (solo verifica existencia en storage)
+	 * No hace petición al servidor - el token se valida automáticamente en cada petición
 	 */
 	static async validateToken(): Promise<TokenValidationResult> {
 		try {
-			console.log('🔍 TokenValidator: Iniciando validación de token...');
+			console.log('🔍 TokenValidator: Verificando token en storage...');
 
-			// Verificar si existe un token
+			// Verificar si existe un token en storage
 			const token = await storageService.getAuthToken();
 			if (!token) {
-				console.log('❌ TokenValidator: No se encontró token');
+				console.log('❌ TokenValidator: No se encontró token en storage');
 				return {
 					isValid: false,
 					error: 'No se encontró token de autenticación'
 				};
 			}
 
-			// Intentar hacer una petición autenticada para validar el token
-			try {
-				// Usar el endpoint de verificación de token
-				const response = await apiService(API_CONFIG.AUTH_ENDPOINTS.VERIFY_TOKEN, {
-					method: 'GET',
-					needsAuth: true
-				});
-
-				console.log('✅ TokenValidator: Token válido');
+			// Obtener datos del usuario del storage
+			const user = await storageService.getCurrentUser();
+			if (!user) {
+				console.log('❌ TokenValidator: No se encontraron datos de usuario');
 				return {
-					isValid: true,
-					user: (response as any)?.data?.user || (response as any)?.user
-				};
-			} catch (apiError) {
-				console.log('❌ TokenValidator: Error validando token:', apiError);
-
-				// Si es un error 401, el token es inválido
-				if (apiError instanceof Error && apiError.message.includes('401')) {
-					console.log('🔐 TokenValidator: Token expirado o inválido');
-					return {
-						isValid: false,
-						error: 'Token expirado o inválido'
-					};
-				}
-
-				// Para otros errores (red, servidor, etc.), asumir que el token es válido
-				// para no bloquear al usuario por problemas temporales
-				console.log('⚠️ TokenValidator: Error temporal, asumiendo token válido');
-				return {
-					isValid: true,
-					error: 'Error temporal de conexión'
+					isValid: false,
+					error: 'No se encontraron datos de usuario'
 				};
 			}
+
+			console.log('✅ TokenValidator: Token encontrado en storage, asumiendo válido');
+			return {
+				isValid: true,
+				user: user
+			};
 		} catch (error) {
 			console.error('❌ TokenValidator: Error inesperado:', error);
 			return {
@@ -73,8 +54,8 @@ export class TokenValidator {
 	}
 
 	/**
-	 * Valida el token de forma rápida (solo verifica que exista)
-	 * Para casos donde no queremos hacer petición al servidor
+	 * Valida el token de forma rápida (solo verifica que exista en storage)
+	 * Este método es redundante ahora que validateToken() no hace peticiones al servidor
 	 */
 	static async validateTokenQuick(): Promise<boolean> {
 		try {

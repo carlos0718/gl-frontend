@@ -185,16 +185,16 @@ export const authService = {
 		try {
 			console.log('✅ Marcando onboarding como completado en el backend...');
 
-			// Obtener el usuario actual para tener el ID
-			const currentUser = await storageService.getCurrentUser();
-			if (!currentUser?.id) {
+			// Obtener el ID del usuario actual
+			const userId = await storageService.getCurrentUserId();
+			if (!userId) {
 				throw new Error('No se pudo obtener el ID del usuario actual');
 			}
 
 			await apiService(API_CONFIG.AUTH_ENDPOINTS.MARK_ONBOARDING_COMPLETE, {
 				method: 'PUT',
 				body: {
-					userId: currentUser.id,
+					userId: userId,
 					doneOnboarding: true
 				},
 				needsAuth: true

@@ -31,7 +31,5 @@ export interface INearbyGroupsRequest {
 	category?: string;
 }
 
-export interface IGroupCategoriesResponse {
-	message: string;
-	data: string[];
-}
+// La interfaz IGroupCategoriesResponse se movió a interfaces/category.ts
+// para mantener una mejor organización de las interfaces

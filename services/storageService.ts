@@ -134,5 +134,19 @@ export const storageService = {
 			console.error('❌ Error limpiando estado de onboarding:', error);
 			throw error;
 		}
+	},
+
+	/**
+	 * Obtener el ID del usuario actual (compatible con MongoDB _id)
+	 */
+	async getCurrentUserId(): Promise<string | null> {
+		try {
+			const user = await this.getCurrentUser();
+			// Usar _id (MongoDB) o id como fallback
+			return user?._id || user?.id || null;
+		} catch (error) {
+			console.error('❌ Error obteniendo ID del usuario:', error);
+			return null;
+		}
 	}
 };

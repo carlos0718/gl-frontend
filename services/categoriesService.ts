@@ -1,14 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {API_CONFIG} from '../config/api';
-import {IGroupCategoriesResponse} from '../interfaces/group';
+import {ICachedCategories, ICategory, IGroupCategoriesResponse} from '../interfaces/category';
 import apiService from './apiService';
-
-interface CachedCategories {
-	categories: string[];
-	timestamp: number;
-	version: number;
-}
 
 /**
  * Servicio especializado para el manejo de categorías con cache inteligente
@@ -25,20 +19,6 @@ export class CategoriesService {
 	private static readonly CACHE_VERSION = 1;
 	private static readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 horas en millisegundos
 
-	// Categorías por defecto como último recurso
-	private static readonly DEFAULT_CATEGORIES = [
-		'Fitness y Ejercicio',
-		'Running y Atletismo',
-		'Deportes de Equipo',
-		'Yoga y Meditación',
-		'Natación y Deportes Acuáticos',
-		'Ciclismo',
-		'Artes Marciales',
-		'Baile y Danza',
-		'Deportes de Aventura',
-		'Otros'
-	];
-
 	/**
 	 * Obtiene las categorías con estrategia de cache inteligente
 	 */
@@ -48,9 +28,16 @@ export class CategoriesService {
 
 			// Paso 1: Intentar cargar desde cache
 			const cachedCategories = await this.getCachedCategories();
-			if (cachedCategories && this.isCacheValid(cachedCategories)) {
+			if (cachedCategories && this.isCacheValid(cachedCategories) && cachedCategories.categories.length > 0) {
 				console.log('✅ CategoriesService: Categorías cargadas desde cache', cachedCategories.categories.length, 'categorías');
-				return cachedCategories.categories;
+				// Extraer solo los nombres de las categorías
+				return cachedCategories.categories.map((cat) => cat.name);
+			}
+
+			// Si el cache está vacío o no tiene categorías válidas, limpiarlo y continuar con la API
+			if (cachedCategories && cachedCategories.categories.length === 0) {
+				console.log('⚠️ CategoriesService: Cache válido pero vacío, limpiando y cargando desde API...');
+				await this.clearEmptyCache();
 			}
 
 			console.log('⏰ CategoriesService: Cache no válido o inexistente, cargando desde API...');
@@ -62,20 +49,21 @@ export class CategoriesService {
 			await this.saveCategoriesCache(apiCategories);
 
 			console.log('✅ CategoriesService: Categorías cargadas desde API y guardadas en cache');
-			return apiCategories;
+			// Extraer solo los nombres de las categorías
+			return apiCategories.map((cat) => cat.name);
 		} catch (error) {
 			console.error('❌ CategoriesService: Error obteniendo categorías:', error);
 
-			// Paso 4: Intentar usar cache expirado como fallback
+			// Paso 4: Intentar usar cache expirado como fallback (solo si tiene categorías)
 			const expiredCache = await this.getCachedCategories();
 			if (expiredCache && expiredCache.categories.length > 0) {
 				console.log('⚠️ CategoriesService: Usando cache expirado como fallback');
-				return expiredCache.categories;
+				return expiredCache.categories.map((cat) => cat.name);
 			}
 
 			// Paso 5: Último recurso - categorías por defecto
 			console.log('🔄 CategoriesService: Usando categorías por defecto');
-			return this.DEFAULT_CATEGORIES;
+			return [];
 		}
 	}
 
@@ -90,7 +78,7 @@ export class CategoriesService {
 			await this.saveCategoriesCache(apiCategories);
 
 			console.log('✅ CategoriesService: Recarga forzada completada');
-			return apiCategories;
+			return apiCategories.map((cat) => cat.name);
 		} catch (error) {
 			console.error('❌ CategoriesService: Error en recarga forzada:', error);
 			throw error;
@@ -106,6 +94,21 @@ export class CategoriesService {
 			console.log('🗑️ CategoriesService: Cache limpiado');
 		} catch (error) {
 			console.error('❌ CategoriesService: Error limpiando cache:', error);
+		}
+	}
+
+	/**
+	 * Limpia el cache si está vacío o corrupto
+	 */
+	static async clearEmptyCache(): Promise<void> {
+		try {
+			const cached = await this.getCachedCategories();
+			if (cached && cached.categories.length === 0) {
+				await AsyncStorage.removeItem(this.CACHE_KEY);
+				console.log('🗑️ CategoriesService: Cache vacío limpiado');
+			}
+		} catch (error) {
+			console.error('❌ CategoriesService: Error limpiando cache vacío:', error);
 		}
 	}
 
@@ -144,7 +147,7 @@ export class CategoriesService {
 	/**
 	 * Obtiene las categorías desde la API con estrategia de fallback
 	 */
-	private static async fetchCategoriesFromAPI(): Promise<string[]> {
+	private static async fetchCategoriesFromAPI(): Promise<ICategory[]> {
 		console.log('🌐 CategoriesService: Obteniendo categorías desde API...');
 
 		// Intentar primero con autenticación
@@ -188,14 +191,14 @@ export class CategoriesService {
 	/**
 	 * Obtiene las categorías desde el cache
 	 */
-	private static async getCachedCategories(): Promise<CachedCategories | null> {
+	private static async getCachedCategories(): Promise<ICachedCategories | null> {
 		try {
 			const cached = await AsyncStorage.getItem(this.CACHE_KEY);
 			if (!cached) {
 				return null;
 			}
 
-			const parsedCache: CachedCategories = JSON.parse(cached);
+			const parsedCache: ICachedCategories = JSON.parse(cached);
 
 			// Verificar versión del cache
 			if (parsedCache.version !== this.CACHE_VERSION) {
@@ -213,7 +216,7 @@ export class CategoriesService {
 	/**
 	 * Verifica si el cache es válido (no ha expirado)
 	 */
-	private static isCacheValid(cached: CachedCategories): boolean {
+	private static isCacheValid(cached: ICachedCategories): boolean {
 		const now = Date.now();
 		const cacheAge = now - cached.timestamp;
 		const isValid = cacheAge < this.CACHE_DURATION;
@@ -225,9 +228,9 @@ export class CategoriesService {
 	/**
 	 * Guarda las categorías en el cache
 	 */
-	private static async saveCategoriesCache(categories: string[]): Promise<void> {
+	private static async saveCategoriesCache(categories: ICategory[]): Promise<void> {
 		try {
-			const cacheData: CachedCategories = {
+			const cacheData: ICachedCategories = {
 				categories,
 				timestamp: Date.now(),
 				version: this.CACHE_VERSION

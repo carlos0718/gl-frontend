@@ -1,5 +1,5 @@
 import {Ionicons} from '@expo/vector-icons';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
 	Image,
 	Keyboard,
@@ -17,6 +17,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {Colors} from '../constants/Colors';
 import {authService} from '../services/authService';
+import {CategoriesService} from '../services/categoriesService';
 import {storageService} from '../services/storageService';
 
 function isValidEmail(email: string) {
@@ -42,8 +43,36 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 	const [showPassword, setShowPassword] = useState(false);
 	// Datos adicionales
 	const [activities, setActivities] = useState<string[]>([]);
+	const [categories, setCategories] = useState<string[]>([]);
 	const [error, setError] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
+
+	// Cargar categorías cuando se llegue al step 4
+	useEffect(() => {
+		if (step === 4) {
+			loadCategories();
+		}
+	}, [step]);
+
+	const loadCategories = async () => {
+		try {
+			console.log('📋 OnboardingWizard: Cargando categorías para selección de actividades...');
+			const cats = await CategoriesService.getCategories();
+
+			if (Array.isArray(cats) && cats.length > 0) {
+				setCategories(cats);
+				console.log('✅ OnboardingWizard: Categorías cargadas exitosamente:', cats.length, 'categorías');
+			} else {
+				console.warn('⚠️ OnboardingWizard: No se obtuvieron categorías, usando fallback');
+				// Fallback con categorías básicas si no hay conexión
+				setCategories(['Fútbol', 'Baloncesto', 'Tenis', 'Natación', 'Ciclismo', 'Yoga', 'Gimnasio', 'Running']);
+			}
+		} catch (error) {
+			console.error('❌ OnboardingWizard: Error cargando categorías:', error);
+			// Fallback con categorías básicas
+			setCategories(['Fútbol', 'Baloncesto', 'Tenis', 'Natación', 'Ciclismo', 'Yoga', 'Gimnasio', 'Running']);
+		}
+	};
 
 	const handleNext = async () => {
 		setError('');
@@ -168,7 +197,7 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 					// Hacer login con las credenciales ingresadas
 					const authResponse = await authService.login(email, password);
 
-					console.log('✅ Login exitoso:', authResponse.data.user.name);
+					console.log('✅ Login exitoso:', authResponse.data.user);
 
 					// Preparar datos adicionales del onboarding
 					const additionalData = {
@@ -401,17 +430,24 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 						<Text style={styles.stepTitle}>¿Qué te gusta hacer?</Text>
 						<Text style={styles.subtitle}>Selecciona tus actividades favoritas</Text>
 						<View style={styles.activitiesGrid}>
-							{['Fútbol', 'Baloncesto', 'Tenis', 'Natación', 'Ciclismo', 'Yoga', 'Gimnasio', 'Running'].map((activity) => (
-								<TouchableOpacity
-									key={activity}
-									style={[styles.activityButton, activities.includes(activity) && styles.activityButtonSelected]}
-									onPress={() => toggleActivity(activity)}
-								>
-									<Text style={[styles.activityText, activities.includes(activity) && styles.activityTextSelected]}>
-										{activity}
-									</Text>
-								</TouchableOpacity>
-							))}
+							{categories.length > 0
+								? categories.map((category) => (
+										<TouchableOpacity
+											key={category}
+											style={[styles.activityButton, activities.includes(category) && styles.activityButtonSelected]}
+											onPress={() => toggleActivity(category)}
+										>
+											<Text style={[styles.activityText, activities.includes(category) && styles.activityTextSelected]}>
+												{category}
+											</Text>
+										</TouchableOpacity>
+								  ))
+								: // Mostrar skeleton mientras se cargan las categorías
+								  Array.from({length: 8}).map((_, index) => (
+										<View key={`skeleton-${index}`} style={[styles.activityButton, styles.activityButtonSkeleton]}>
+											<View style={styles.skeletonText} />
+										</View>
+								  ))}
 						</View>
 					</View>
 				);
@@ -613,6 +649,16 @@ const styles = StyleSheet.create({
 	},
 	activityTextSelected: {
 		color: '#fff'
+	},
+	activityButtonSkeleton: {
+		backgroundColor: Colors.light.tabIconDefault + '20',
+		borderColor: Colors.light.tabIconDefault + '40'
+	},
+	skeletonText: {
+		width: '60%',
+		height: 16,
+		backgroundColor: Colors.light.tabIconDefault + '30',
+		borderRadius: 8
 	},
 	buttonContainer: {
 		flexDirection: 'row',
