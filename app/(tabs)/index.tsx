@@ -195,10 +195,17 @@ export default function HomeScreen() {
 	};
 
 	// Función para manejar grupo creado
-	const handleGroupCreated = (newGroup: IGroup) => {
-		// Recargar grupos para incluir el nuevo grupo
-		refreshGroups();
+	const handleGroupCreated = async (newGroup: IGroup) => {
+		console.log('🎉 Grupo creado exitosamente, actualizando lista:', newGroup.name);
 		setShowCreateGroupModal(false);
+		
+		// Recargar grupos para incluir el nuevo grupo
+		await refreshGroups();
+		
+		// También podemos recargar los grupos cercanos para asegurar que aparezca
+		if (userLocation) {
+			await loadNearbyGroups();
+		}
 	};
 
 	// Función para aumentar el radio de búsqueda
@@ -345,8 +352,8 @@ export default function HomeScreen() {
 					</View>
 				</ScrollView>
 
-				{/* Botón flotante para crear grupo - solo cuando NO hay grupos */}
-				{userLocation && !hasGroups && !isLoadingGroups && (
+				{/* Botón flotante para crear grupo - siempre visible cuando hay ubicación */}
+				{userLocation && !isLoadingGroups && (
 					<TouchableOpacity style={styles.floatingCreateButton} onPress={handleCreateGroup}>
 						<Ionicons name='add' size={24} color={Colors.light.background} />
 					</TouchableOpacity>

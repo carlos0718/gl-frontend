@@ -19,6 +19,7 @@ import {ICategory} from '../interfaces/category';
 import {ICreateGroupRequest, IGroup} from '../interfaces/group';
 import {CategoriesService} from '../services/categoriesService';
 import {GroupService} from '../services/groupService';
+import {storageService} from '../services/storageService';
 
 interface CreateGroupModalProps {
 	visible: boolean;
@@ -102,7 +103,7 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 			Alert.alert('Error', 'Por favor ingresa una descripción del grupo');
 			return false;
 		}
-		if (!category) {
+		if (!category || category.trim() === '') {
 			Alert.alert('Error', 'Por favor selecciona una categoría');
 			return false;
 		}
@@ -118,17 +119,24 @@ export default function CreateGroupModal({visible, onClose, onGroupCreated, user
 
 		setIsLoading(true);
 		try {
+			// Get current user ID
+			const userId = await storageService.getCurrentUserId();
+			console.log('👤 Current user ID:', userId);
+
 			const groupData: ICreateGroupRequest = {
 				name: groupName.trim(),
 				description: description.trim(),
-				address: userLocation!.address,
-				latitude: userLocation!.latitude,
-				longitude: userLocation!.longitude,
-				maxMembers,
-				category
+				address: userLocation!.address.trim(),
+				latitude: Number(userLocation!.latitude),
+				longitude: Number(userLocation!.longitude),
+				maxMembers: Number(maxMembers),
+				category: category.trim(),
+				...(userId && { createdBy: userId }) // Include user ID if available
 			};
-
+			console.log('🚀 Creando grupo:', groupData.name);
+			
 			const newGroup = await GroupService.createGroup(groupData);
+			console.log('✅ Grupo creado exitosamente:', newGroup.name);
 
 			Alert.alert('¡Grupo creado exitosamente!', `El grupo "${newGroup.name}" ha sido creado. Ya puedes empezar a invitar miembros.`, [
 				{

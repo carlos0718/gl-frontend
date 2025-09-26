@@ -40,13 +40,15 @@ async function apiService<T>(endpoint: string, options: RequestOptions = {}): Pr
 
 	try {
 		const fullUrl = `${API_URL}/${endpoint}`;
-		console.log('🌐 API Request:', fullUrl);
-		console.log('📡 Request config:', {method, headers, body});
+		console.log('🌐 API Request:', method, fullUrl);
 
 		const response = await fetch(fullUrl, config);
-		console.log('🟢 Response:', response);
+		console.log('🟢 Response status:', response.status);
 		if (!response.ok) {
 			const errorData = await response.json().catch(() => ({message: 'Error desconocido en la API'}));
+			console.log('❌ Error response data:', errorData);
+			console.log('❌ Response status:', response.status);
+			console.log('❌ Response headers:', response.headers);
 
 			// Manejo específico de errores de autenticación
 			if (response.status === 401) {

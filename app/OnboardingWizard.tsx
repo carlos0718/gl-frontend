@@ -1,4 +1,5 @@
 import {Ionicons} from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import React, {useEffect, useState} from 'react';
 import {
 	Image,
@@ -16,7 +17,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {Colors} from '../constants/Colors';
-import {authService} from '../services/authService';
+import {IRegisterRequest, authService} from '../services/authService';
 import {CategoriesService} from '../services/categoriesService';
 import {storageService} from '../services/storageService';
 
@@ -29,7 +30,8 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 	const [name, setName] = useState('');
 	const [lastName, setLastName] = useState('');
 	const [age, setAge] = useState('');
-	const [birthDate, setBirthDate] = useState('');
+	const [birthDate, setBirthDate] = useState(new Date());
+	const [showDatePicker, setShowDatePicker] = useState(false);
 	const [gender, setGender] = useState('');
 	const [phone, setPhone] = useState('');
 	// Datos de ubicación
@@ -83,7 +85,7 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 				break;
 
 			case 1: // Personal details
-				if (!name.trim() || !lastName.trim() || !age.trim() || !birthDate.trim() || !gender || !phone.trim()) {
+				if (!name.trim() || !lastName.trim() || !age.trim() || !birthDate || !gender || !phone.trim()) {
 					setError('Por favor completa todos los campos');
 					return;
 				}
@@ -138,13 +140,13 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 						email,
 						password,
 						age: Number(age),
-						birthDate,
+						birthDate: birthDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
 						gender: gender as 'male' | 'female' | 'Otro',
 						phone
 					};
 
 					// Registrar usuario en el backend
-					await authService.register(registerData);
+					await authService.register(registerData as IRegisterRequest);
 
 					console.log('✅ Usuario registrado exitosamente, pasando al step de login...');
 
@@ -204,7 +206,7 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 						name,
 						lastName,
 						age: Number(age),
-						birthDate,
+						birthDate: birthDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
 						gender: gender as 'male' | 'female' | 'Otro',
 						phone,
 						country,
@@ -269,6 +271,17 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 		setActivities((prev) => (prev.includes(activity) ? prev.filter((a) => a !== activity) : [...prev, activity]));
 	};
 
+	const onDateChange = (event: any, selectedDate?: Date) => {
+		setShowDatePicker(false);
+		if (selectedDate) {
+			setBirthDate(selectedDate);
+		}
+	};
+
+	const showDatePickerModal = () => {
+		setShowDatePicker(true);
+	};
+
 	const renderStep = () => {
 		switch (step) {
 			case 0:
@@ -309,13 +322,12 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 							onChangeText={setAge}
 							keyboardType='numeric'
 						/>
-						<TextInput
-							style={styles.input}
-							placeholder='Fecha de nacimiento (YYYY-MM-DD)'
-							placeholderTextColor={Colors.light.icon}
-							value={birthDate}
-							onChangeText={setBirthDate}
-						/>
+						<TouchableOpacity style={styles.datePickerButton} onPress={showDatePickerModal}>
+							<Text style={[styles.datePickerText, !birthDate && styles.datePickerPlaceholder]}>
+								{birthDate ? birthDate.toLocaleDateString('es-ES') : 'Fecha de nacimiento'}
+							</Text>
+							<Ionicons name='calendar-outline' size={20} color={Colors.light.icon} />
+						</TouchableOpacity>
 						<TextInput
 							style={styles.input}
 							placeholder='Teléfono'
@@ -339,6 +351,17 @@ export default function OnboardingWizard({onFinish}: {onFinish: () => void}) {
 								</TouchableOpacity>
 							))}
 						</View>
+
+						{showDatePicker && (
+							<DateTimePicker
+								testID='dateTimePicker'
+								value={birthDate}
+								mode='date'
+								is24Hour={true}
+								onChange={onDateChange}
+								maximumDate={new Date()}
+							/>
+						)}
 
 						<View style={styles.divider}>
 							<View style={styles.dividerLine} />
@@ -741,5 +764,24 @@ const styles = StyleSheet.create({
 	loginContainer: {
 		width: '100%',
 		marginTop: 24
+	},
+	datePickerButton: {
+		width: '100%',
+		borderWidth: 1,
+		borderColor: Colors.light.icon,
+		borderRadius: 12,
+		padding: 12,
+		marginBottom: 12,
+		backgroundColor: Colors.light.card,
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center'
+	},
+	datePickerText: {
+		fontSize: 16,
+		color: Colors.light.text
+	},
+	datePickerPlaceholder: {
+		color: Colors.light.icon
 	}
 });

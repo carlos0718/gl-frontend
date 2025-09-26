@@ -22,6 +22,7 @@ export interface ICreateGroupRequest {
 	longitude: number;
 	maxMembers: number;
 	category: string;
+	createdBy?: string; // Optional for now to test
 }
 
 export interface INearbyGroupsRequest {

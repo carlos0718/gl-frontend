@@ -32,16 +32,18 @@ export class GroupService {
 	// Crear un nuevo grupo
 	static async createGroup(groupData: ICreateGroupRequest): Promise<IGroup> {
 		try {
-			console.log('🏗️ Creando grupo con datos:', groupData);
+			console.log('🔧 GroupService: Creando grupo:', groupData.name);
 
-			const result = await apiService<IGroup>(API_CONFIG.GROUPS_ENDPOINTS.CREATE, {
+			const result = await apiService<{data: IGroup; message: string}>(API_CONFIG.GROUPS_ENDPOINTS.CREATE, {
 				method: 'POST',
 				body: groupData,
 				needsAuth: true
 			});
 
-			console.log('✅ Grupo creado exitosamente:', result);
-			return result;
+			console.log('✅ GroupService: Grupo creado exitosamente');
+			
+			// Extract the actual group data from the response
+			return result.data || (result as unknown as IGroup);
 		} catch (error) {
 			console.error('❌ Error creating group:', error);
 			throw error;
