@@ -41,9 +41,12 @@ export default function ProfileScreen() {
 			quality: 0.5
 		});
 
-		if (!result.canceled) {
-			setAvatar(result.assets[0].uri);
-			AsyncStorage.setItem('userAvatar', result.assets[0].uri);
+		if (!result.canceled && result.assets && result.assets.length > 0) {
+			const selectedAsset = result.assets[0];
+			if (selectedAsset?.uri) {
+				setAvatar(selectedAsset.uri);
+				AsyncStorage.setItem('userAvatar', selectedAsset.uri);
+			}
 		}
 	};
 
